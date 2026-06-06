@@ -1,0 +1,187 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply bg-lightBg text-lightText transition-colors duration-500;
+  }
+
+  html.dark {
+    @apply bg-graphite-950 text-ivory-100 transition-colors duration-500;
+  }
+
+  body {
+    @apply font-sans;
+  }
+
+  ::selection {
+    @apply bg-gold-500/30 text-lightText;
+  }
+
+  html.dark ::selection {
+    @apply bg-gold-500/30 text-ivory-50;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  /* Button Styles */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-8 py-4 bg-gold-600 text-graphite-950 font-semibold text-base rounded-sm transition-all duration-300 hover:bg-gold-500 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-gold-400 focus:ring-offset-2 focus:ring-offset-lightBg;
+  }
+
+  html.dark .btn-primary {
+    @apply focus:ring-offset-graphite-950;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-8 py-4 border text-base font-medium rounded-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply border-gold-700 text-gold-700 hover:border-gold-600 hover:text-gold-600 hover:bg-gold-50 focus:ring-gold-600 focus:ring-offset-lightBg;
+  }
+
+  html.dark .btn-secondary {
+    @apply border-gold-500 text-ivory-100 hover:border-gold-400 hover:text-gold-400 focus:ring-gold-400 focus:ring-offset-graphite-950;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center px-6 py-3 font-medium text-sm transition-all duration-300 focus:outline-none;
+  }
+
+  .btn-ghost {
+    @apply text-gold-700 hover:text-gold-600;
+  }
+
+  html.dark .btn-ghost {
+    @apply text-ivory-300 hover:text-gold-400;
+  }
+
+  /* Section Layout */
+  .section-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-padding {
+    @apply py-20 md:py-28 lg:py-32;
+  }
+
+  /* Dividers */
+  .gold-divider {
+    @apply w-24 h-px bg-gradient-to-r from-transparent via-gold-600 to-transparent;
+  }
+
+  html.dark .gold-divider {
+    @apply from-transparent via-gold-500 to-transparent;
+  }
+
+  .gold-line {
+    @apply h-px bg-gradient-to-r;
+  }
+
+  .gold-line {
+    @apply from-gold-600/0 via-gold-700/60 to-gold-600/0;
+  }
+
+  html.dark .gold-line {
+    @apply from-gold-600/0 via-gold-500/50 to-gold-600/0;
+  }
+
+  /* Museum Label */
+  .museum-label {
+    @apply text-xs font-medium tracking-[0.2em] uppercase;
+  }
+
+  .museum-label {
+    @apply text-gold-800;
+  }
+
+  html.dark .museum-label {
+    @apply text-ivory-400/70;
+  }
+
+  /* Statistics */
+  .stat-number {
+    @apply font-serif text-5xl md:text-6xl lg:text-7xl font-bold text-gold-700;
+  }
+
+  html.dark .stat-number {
+    @apply text-gold-400;
+  }
+
+  /* Cards */
+  .card-museum {
+    @apply border rounded-sm p-6 transition-all duration-300;
+  }
+
+  .card-museum {
+    @apply bg-lightBgSecondary border-gold-700/30 hover:border-gold-600 hover:shadow-light-shadow;
+  }
+
+  html.dark .card-museum {
+    @apply bg-graphite-900/50 border-ivory-100/10 hover:border-gold-500/30 hover:shadow-museum;
+  }
+
+  /* Form Fields */
+  .input-field {
+    @apply w-full border rounded-sm px-4 py-3 font-sans placeholder:transition-colors duration-200 focus:outline-none focus:border-gold-600 focus:ring-1 focus:ring-gold-600/50 transition-all duration-200;
+  }
+
+  .input-field {
+    @apply bg-white text-lightText border-gold-700/30 placeholder:text-lightTextSecondary/70;
+  }
+
+  html.dark .input-field {
+    @apply bg-graphite-900/50 text-ivory-100 border-ivory-100/20 placeholder:text-ivory-400/50 focus:border-gold-500 focus:ring-gold-500/50;
+  }
+
+  /* Image Placeholder */
+  .image-placeholder {
+    @apply flex items-center justify-center;
+  }
+
+  .image-placeholder {
+    @apply bg-gradient-to-br from-lightBgSecondary to-gold-100/30;
+  }
+
+  html.dark .image-placeholder {
+    @apply from-graphite-800 to-graphite-900;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .vignette {
+    box-shadow: inset 0 0 150px 50px rgba(0, 0, 0, 0.7);
+  }
+
+  .vignette-light {
+    box-shadow: inset 0 0 150px 50px rgba(0, 0, 0, 0.05);
+  }
+
+  .parallax-slow {
+    transform: translateZ(0);
+  }
+
+  /* Hero text shadows for legibility over map background */
+  .hero-text-shadow {
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85), 0 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .hero-text-shadow-light {
+    text-shadow: 0 1px 6px rgba(255, 255, 255, 0.9), 0 2px 16px rgba(255, 255, 255, 0.7);
+  }
+}
