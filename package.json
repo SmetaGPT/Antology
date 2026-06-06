@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "release:check": "node scripts/release/check.mjs",
     "agent:sync": "node scripts/agent/sync-snapshot.mjs",
     "agent:validate": "node scripts/agent/validate-state.mjs",
     "agent:estimate": "node scripts/agent/estimate-startup.mjs",

@@ -30,6 +30,9 @@ def init_database(database_path: Path) -> None:
                 purpose TEXT NOT NULL,
                 format TEXT NOT NULL,
                 consent INTEGER NOT NULL,
+                consent_at TEXT,
+                request_ip TEXT,
+                user_agent TEXT,
                 electronic_status TEXT NOT NULL,
                 paper_status TEXT NOT NULL,
                 paper_pickup_info TEXT,
@@ -108,4 +111,10 @@ def init_database(database_path: Path) -> None:
             connection.execute("ALTER TABLE requests ADD COLUMN paper_pickup_info TEXT")
         if "paper_admin_note" not in existing_request_columns:
             connection.execute("ALTER TABLE requests ADD COLUMN paper_admin_note TEXT")
+        if "consent_at" not in existing_request_columns:
+            connection.execute("ALTER TABLE requests ADD COLUMN consent_at TEXT")
+        if "request_ip" not in existing_request_columns:
+            connection.execute("ALTER TABLE requests ADD COLUMN request_ip TEXT")
+        if "user_agent" not in existing_request_columns:
+            connection.execute("ALTER TABLE requests ADD COLUMN user_agent TEXT")
         connection.commit()

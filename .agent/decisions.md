@@ -96,3 +96,45 @@
   - each decision writes an `admin_events` audit row
 - Why: the printed-edition flow is operationally small, but it still needs
   durable review state, traceability, and delayed outbound email handling.
+
+### DEC-009
+
+- Status: accepted
+- Decision: book revision management stays in the same admin surface and stores
+  PDF files in the configured server-side book storage directory.
+- Shape:
+  - PDF uploads are validated by content type, extension, and size cap
+  - uploaded files are stored under `BOOK_STORAGE_DIR` with generated filenames
+  - `book_versions` keeps checksum, size, and active flag
+  - admins can activate a different version without re-uploading the file
+- Why: the book is a core project asset, and a single lightweight admin flow is
+  enough to manage versions without introducing object storage or a second app
+  before the first production release.
+
+### DEC-010
+
+- Status: accepted
+- Decision: the first production release uses lightweight anti-spam and privacy
+  controls instead of an external abuse-prevention service.
+- Shape:
+  - honeypot submissions are silently accepted but not persisted
+  - repeated submissions are rate-limited by email and IP inside SQLite-backed logic
+  - requests now store consent timestamp and basic request metadata
+  - legal links point to local static policy pages instead of placeholders
+- Why: the landing flow is narrow, traffic is expected to stay modest, and these
+  controls close the main release risks without introducing more infrastructure.
+
+### DEC-011
+
+- Status: accepted
+- Decision: release hardening uses one repository-level validation command and
+  production-safe FastAPI defaults.
+- Shape:
+  - `npm run release:check` runs agent harness validation, frontend typecheck,
+    frontend build, and backend smoke tests
+  - FastAPI public docs and OpenAPI endpoints are disabled by default in production
+  - backend and worker emit structured JSON logs to stdout/stderr
+  - dependency review uses `npm audit --omit=dev` for frontend production deps
+    and `pip_audit` for backend Python deps
+- Why: the first release needs one repeatable validation path and minimal
+  operational hardening without adding CI-only complexity.

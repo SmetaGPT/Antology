@@ -51,6 +51,9 @@ def create_request(
                 purpose,
                 format,
                 consent,
+                consent_at,
+                request_ip,
+                user_agent,
                 electronic_status,
                 paper_status,
                 paper_pickup_info,
@@ -58,7 +61,7 @@ def create_request(
                 delivery_token_candidate,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 request_payload["first_name"],
@@ -70,6 +73,9 @@ def create_request(
                 request_payload["purpose"],
                 request_payload["format"],
                 1 if request_payload["consent"] else 0,
+                request_payload.get("consent_at"),
+                request_payload.get("request_ip"),
+                request_payload.get("user_agent"),
                 electronic_status,
                 paper_status,
                 None,
@@ -152,6 +158,28 @@ def list_email_jobs(database_path: Path, request_id: int) -> list[sqlite3.Row]:
             "SELECT * FROM email_jobs WHERE request_id = ? ORDER BY id ASC",
             (request_id,),
         ).fetchall()
+
+
+def count_recent_requests(
+    database_path: Path,
+    *,
+    email: str,
+    request_ip: str | None,
+    created_after: str,
+) -> tuple[int, int]:
+    with connect(database_path) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                SUM(CASE WHEN email = ? THEN 1 ELSE 0 END) AS email_count,
+                SUM(CASE WHEN request_ip = ? THEN 1 ELSE 0 END) AS ip_count
+            FROM requests
+            WHERE created_at >= ?
+            """,
+            (email, request_ip, created_after),
+        ).fetchone()
+
+    return int(row["email_count"] or 0), int(row["ip_count"] or 0)
 
 
 def list_due_email_jobs(
@@ -308,6 +336,42 @@ def get_active_book_version(database_path: Path) -> sqlite3.Row | None:
         return connection.execute(
             "SELECT * FROM book_versions WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
         ).fetchone()
+
+
+def list_book_versions(database_path: Path) -> list[sqlite3.Row]:
+    with connect(database_path) as connection:
+        return connection.execute(
+            "SELECT * FROM book_versions ORDER BY uploaded_at DESC, id DESC"
+        ).fetchall()
+
+
+def get_book_version(database_path: Path, book_version_id: int) -> sqlite3.Row | None:
+    with connect(database_path) as connection:
+        return connection.execute(
+            "SELECT * FROM book_versions WHERE id = ?",
+            (book_version_id,),
+        ).fetchone()
+
+
+def activate_book_version(
+    database_path: Path,
+    *,
+    book_version_id: int,
+) -> None:
+    with connect(database_path) as connection:
+        row = connection.execute(
+            "SELECT id FROM book_versions WHERE id = ?",
+            (book_version_id,),
+        ).fetchone()
+        if row is None:
+            raise LookupError("Book version was not found")
+
+        connection.execute("UPDATE book_versions SET is_active = 0")
+        connection.execute(
+            "UPDATE book_versions SET is_active = 1 WHERE id = ?",
+            (book_version_id,),
+        )
+        connection.commit()
 
 
 def create_download_token(

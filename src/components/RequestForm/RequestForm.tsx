@@ -12,6 +12,7 @@ interface FormData {
   email: string;
   phone: string;
   purpose: string;
+  honeypot: string;
   format: 'electronic' | 'paper' | 'both';
   consent: boolean;
 }
@@ -33,6 +34,7 @@ const initialFormData: FormData = {
   email: '',
   phone: '',
   purpose: '',
+  honeypot: '',
   format: 'electronic',
   consent: false,
 };
@@ -98,6 +100,7 @@ export function RequestForm() {
           email: formData.email.trim(),
           phone: formData.phone.trim() || null,
           purpose: formData.purpose.trim(),
+          honeypot: formData.honeypot.trim() || null,
           format: formData.format,
           consent: formData.consent,
         }),
@@ -105,6 +108,9 @@ export function RequestForm() {
 
       if (!response.ok) {
         const fallbackMessage =
+          response.status === 429
+            ? 'Слишком много повторных заявок. Попробуйте отправить форму позже.'
+            : 
           response.status === 422
             ? 'Проверьте правильность заполнения полей формы.'
             : 'Не удалось отправить заявку. Попробуйте ещё раз.';
@@ -166,7 +172,7 @@ export function RequestForm() {
               Заявка принята
             </h3>
             <p className={`text-lg mb-8 ${isDark ? 'text-ivory-300/80' : 'text-lightTextSecondary/80'}`}>
-              После рассмотрения мы свяжемся с вами и направим информацию о доступе.
+              Заявка зафиксирована. Ссылка на электронную версию или решение по печатному комплекту будут отправлены по выбранному сценарию.
             </p>
               <button
                 onClick={() => {
@@ -220,6 +226,18 @@ export function RequestForm() {
             onSubmit={handleSubmit}
             className="space-y-6"
           >
+            <div className="absolute -left-[9999px] top-auto w-px h-px overflow-hidden" aria-hidden="true">
+              <label htmlFor="company-website">Сайт компании</label>
+              <input
+                id="company-website"
+                type="text"
+                name="honeypot"
+                value={formData.honeypot}
+                onChange={handleChange}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
             {/* Two columns - Name */}
             <div className="grid sm:grid-cols-2 gap-6">
               <div>
@@ -432,7 +450,7 @@ export function RequestForm() {
                 <span className={`text-sm leading-relaxed ${isDark ? 'text-ivory-300/80' : 'text-lightText/80'}`}>
                   Я даю согласие на обработку персональных данных и подтверждаю, что
                   ознакомился с{' '}
-                  <a href="#" className={`underline ${isDark ? 'text-gold-400 hover:text-gold-300' : 'text-gold-700 hover:text-gold-600'}`}>
+                  <a href="/privacy-policy.html" target="_blank" rel="noreferrer" className={`underline ${isDark ? 'text-gold-400 hover:text-gold-300' : 'text-gold-700 hover:text-gold-600'}`}>
                     политикой обработки персональных данных
                   </a>
                 </span>

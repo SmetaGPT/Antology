@@ -35,12 +35,14 @@ Exit criteria:
 - Runtime choice: Python `FastAPI` service.
 - Initial persistence choice: local `SQLite` for development bootstrap.
 - Current baseline:
-  - request intake and status workflow is live
-  - tokenized download endpoint is live
-  - delayed email worker is live
+- request intake and status workflow is live
+- tokenized download endpoint is live
+- delayed email worker is live
 - admin authentication and dashboard are live
 - paper-review actions, audit events, and follow-up email jobs are live
-- Next backend work should support book upload and active-version management.
+- book upload and active-version management are live
+- anti-spam, consent evidence, and local legal pages are live
+- Next work should support deployment, persistent runtime layout, and backups.
 
 Exit criteria:
 - A real endpoint exists.

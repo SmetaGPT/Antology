@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.production
+runtime
+backend/.venv
+backend/data/*.db
+__pycache__/
+*.pyc
+.pytest_cache/
+ops-backups/

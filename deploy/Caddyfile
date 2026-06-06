@@ -1,0 +1,17 @@
+:80 {
+	encode gzip zstd
+
+	@backend_routes {
+		path /api/* /download/* /admin /admin/* /healthz
+	}
+
+	handle @backend_routes {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

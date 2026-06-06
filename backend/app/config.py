@@ -14,8 +14,13 @@ class Settings:
     public_base_url: str
     database_path: Path
     book_storage_dir: Path
+    expose_api_docs: bool
     download_token_ttl_hours: int
+    max_book_upload_mb: int
     delivery_delay_minutes: int
+    rate_limit_window_minutes: int
+    rate_limit_max_per_ip: int
+    rate_limit_max_per_email: int
     smtp_host: str
     smtp_port: int
     smtp_username: str
@@ -42,19 +47,25 @@ def _env_flag(name: str, default: bool) -> bool:
 
 
 def get_settings() -> Settings:
+    app_env = os.getenv("APP_ENV", "development")
     database_path = Path(os.getenv("DATABASE_PATH", "backend/data/leads.db"))
     book_storage_dir = Path(os.getenv("BOOK_STORAGE_DIR", "backend/data/books"))
 
     return Settings(
         app_name=os.getenv("APP_NAME", "Antology API"),
-        app_env=os.getenv("APP_ENV", "development"),
+        app_env=app_env,
         api_prefix=os.getenv("API_PREFIX", "/api"),
         cors_origins=_split_csv(os.getenv("CORS_ORIGINS", "http://localhost:5173")),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/"),
         database_path=database_path,
         book_storage_dir=book_storage_dir,
+        expose_api_docs=_env_flag("EXPOSE_API_DOCS", app_env != "production"),
         download_token_ttl_hours=int(os.getenv("DOWNLOAD_TOKEN_TTL_HOURS", "72")),
+        max_book_upload_mb=int(os.getenv("MAX_BOOK_UPLOAD_MB", "250")),
         delivery_delay_minutes=int(os.getenv("DELIVERY_DELAY_MINUTES", "30")),
+        rate_limit_window_minutes=int(os.getenv("RATE_LIMIT_WINDOW_MINUTES", "60")),
+        rate_limit_max_per_ip=int(os.getenv("RATE_LIMIT_MAX_PER_IP", "10")),
+        rate_limit_max_per_email=int(os.getenv("RATE_LIMIT_MAX_PER_EMAIL", "3")),
         smtp_host=os.getenv("SMTP_HOST", "localhost"),
         smtp_port=int(os.getenv("SMTP_PORT", "1025")),
         smtp_username=os.getenv("SMTP_USERNAME", ""),

@@ -1,0 +1,93 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      API_PREFIX: /api
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      EXPOSE_API_DOCS: ${EXPOSE_API_DOCS:-false}
+      DATABASE_PATH: /data/leads.db
+      BOOK_STORAGE_DIR: /data/books
+      DOWNLOAD_TOKEN_TTL_HOURS: ${DOWNLOAD_TOKEN_TTL_HOURS:-72}
+      MAX_BOOK_UPLOAD_MB: ${MAX_BOOK_UPLOAD_MB:-250}
+      DELIVERY_DELAY_MINUTES: ${DELIVERY_DELAY_MINUTES:-30}
+      RATE_LIMIT_WINDOW_MINUTES: ${RATE_LIMIT_WINDOW_MINUTES:-60}
+      RATE_LIMIT_MAX_PER_IP: ${RATE_LIMIT_MAX_PER_IP:-10}
+      RATE_LIMIT_MAX_PER_EMAIL: ${RATE_LIMIT_MAX_PER_EMAIL:-3}
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@example.com}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      EMAIL_MAX_RETRIES: ${EMAIL_MAX_RETRIES:-3}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-15}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      SECRET_KEY: ${SECRET_KEY:-replace-this-secret}
+    volumes:
+      - ${RUNTIME_DATA_DIR:-./runtime/data}:/data
+      - ${RUNTIME_LOG_DIR:-./runtime/logs}:/var/log/antology
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment:
+      APP_ENV: production
+      API_PREFIX: /api
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      EXPOSE_API_DOCS: ${EXPOSE_API_DOCS:-false}
+      DATABASE_PATH: /data/leads.db
+      BOOK_STORAGE_DIR: /data/books
+      DOWNLOAD_TOKEN_TTL_HOURS: ${DOWNLOAD_TOKEN_TTL_HOURS:-72}
+      MAX_BOOK_UPLOAD_MB: ${MAX_BOOK_UPLOAD_MB:-250}
+      DELIVERY_DELAY_MINUTES: ${DELIVERY_DELAY_MINUTES:-30}
+      RATE_LIMIT_WINDOW_MINUTES: ${RATE_LIMIT_WINDOW_MINUTES:-60}
+      RATE_LIMIT_MAX_PER_IP: ${RATE_LIMIT_MAX_PER_IP:-10}
+      RATE_LIMIT_MAX_PER_EMAIL: ${RATE_LIMIT_MAX_PER_EMAIL:-3}
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@example.com}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      EMAIL_MAX_RETRIES: ${EMAIL_MAX_RETRIES:-3}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-15}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      SECRET_KEY: ${SECRET_KEY:-replace-this-secret}
+    volumes:
+      - ${RUNTIME_DATA_DIR:-./runtime/data}:/data
+      - ${RUNTIME_LOG_DIR:-./runtime/logs}:/var/log/antology
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "${MAILHOG_UI_PORT:-8025}:8025"

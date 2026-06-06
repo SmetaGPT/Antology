@@ -18,7 +18,7 @@ function App() {
   return (
     <div className={`min-h-screen overflow-x-hidden transition-colors duration-500 ${
       theme === 'dark' ? 'dark' : ''
-    }`}>
+    }`} id="top">
       <Header />
       <main>
         <Hero />

@@ -4,9 +4,11 @@ from datetime import datetime, timedelta, timezone
 from hashlib import pbkdf2_hmac, sha256
 import hmac
 from pathlib import Path
+from typing import TypedDict
 
 from fastapi import HTTPException, Request, status
 
+from .book_admin_service import build_book_versions_context
 from .config import Settings
 from .repository import (
     get_admin_dashboard_counts,
@@ -18,6 +20,11 @@ from .repository import (
 
 SESSION_COOKIE_NAME = "antology_admin_session"
 SESSION_TTL_HOURS = 8
+
+
+class AdminUserIdentity(TypedDict):
+    id: int
+    email: str
 
 
 def _utc_now() -> datetime:
@@ -46,7 +53,7 @@ def authenticate_admin(
     *,
     email: str,
     password: str,
-) -> dict[str, object] | None:
+) -> AdminUserIdentity | None:
     admin_user = get_admin_user_by_email(database_path, email)
     if admin_user is None or int(admin_user["is_active"]) != 1:
         return None
@@ -93,7 +100,7 @@ def read_admin_session(settings: Settings, token: str) -> int | None:
     return admin_user_id
 
 
-def require_admin_user(request: Request, database_path: Path, settings: Settings) -> dict[str, object]:
+def require_admin_user(request: Request, database_path: Path, settings: Settings) -> AdminUserIdentity:
     token = request.cookies.get(SESSION_COOKIE_NAME)
     admin_user_id = read_admin_session(settings, token) if token else None
     if admin_user_id is None:
@@ -119,7 +126,7 @@ def build_dashboard_context(
     electronic_status: str | None,
     paper_status: str | None,
 ) -> dict[str, object]:
-    return {
+    context: dict[str, object] = {
         "counts": get_admin_dashboard_counts(database_path),
         "requests": list_requests_for_admin(
             database_path,
@@ -133,3 +140,5 @@ def build_dashboard_context(
             "paper_status": paper_status or "",
         },
     }
+    context.update(build_book_versions_context(database_path))
+    return context

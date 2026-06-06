@@ -11,8 +11,8 @@ const navLinks = [
 ];
 
 const legalLinks = [
-  { label: 'Политика обработки персональных данных', href: '#' },
-  { label: 'Пользовательское соглашение', href: '#' },
+  { label: 'Политика обработки персональных данных', href: '/privacy-policy.html' },
+  { label: 'Пользовательское соглашение', href: '/terms.html' },
 ];
 
 export function Footer() {
@@ -77,16 +77,14 @@ export function Footer() {
             <h4 className={`font-serif text-base mb-4 transition-colors ${isDark ? 'text-ivory-100' : 'text-lightText'}`}>Контакты</h4>
             <ul className="space-y-3">
               <li className={`text-sm transition-colors ${isDark ? 'text-ivory-300/70' : 'text-lightTextSecondary'}`}>
-                <span className={`block text-xs mb-1 transition-colors ${isDark ? 'text-ivory-400/50' : 'text-lightTextSecondary/70'}`}>Email</span>
-                <a href="mailto:info@example.com" className={`transition-colors ${isDark ? 'hover:text-gold-400' : 'hover:text-gold-600'}`}>
-                  info@example.com
+                <span className={`block text-xs mb-1 transition-colors ${isDark ? 'text-ivory-400/50' : 'text-lightTextSecondary/70'}`}>Основной канал</span>
+                <a href="#request-form" className={`transition-colors ${isDark ? 'hover:text-gold-400' : 'hover:text-gold-600'}`}>
+                  Форма запроса на сайте
                 </a>
               </li>
               <li className={`text-sm transition-colors ${isDark ? 'text-ivory-300/70' : 'text-lightTextSecondary'}`}>
-                <span className={`block text-xs mb-1 transition-colors ${isDark ? 'text-ivory-400/50' : 'text-lightTextSecondary/70'}`}>Телефон</span>
-                <a href="tel:+78001234567" className={`transition-colors ${isDark ? 'hover:text-gold-400' : 'hover:text-gold-600'}`}>
-                  +7 (800) 123-45-67
-                </a>
+                <span className={`block text-xs mb-1 transition-colors ${isDark ? 'text-ivory-400/50' : 'text-lightTextSecondary/70'}`}>Режим обработки</span>
+                <span>Электронные заявки обрабатываются автоматически, запросы на печатный комплект проходят ручное рассмотрение.</span>
               </li>
             </ul>
           </motion.div>

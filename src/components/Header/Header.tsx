@@ -43,7 +43,7 @@ export function Header() {
       <div className="section-container">
         <nav className="flex items-center justify-between h-20">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-3 group">
+          <a href="#top" className="flex items-center gap-3 group">
             <div
               className={`w-10 h-10 border rounded-sm flex items-center justify-center transition-colors ${
                 theme === 'dark'

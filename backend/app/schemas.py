@@ -18,9 +18,10 @@ class RequestAccessPayload(BaseModel):
     phone: str | None = Field(default=None, max_length=50)
     purpose: str = Field(min_length=10, max_length=2000)
     format: Literal["electronic", "paper", "both"]
+    honeypot: str | None = Field(default=None, max_length=200)
     consent: bool
 
-    @field_validator("first_name", "last_name", "organization", "position", "phone", "purpose")
+    @field_validator("first_name", "last_name", "organization", "position", "phone", "purpose", "honeypot")
     @classmethod
     def strip_values(cls, value: str | None) -> str | None:
         if value is None:

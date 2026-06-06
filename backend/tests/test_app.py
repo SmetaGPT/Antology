@@ -1,24 +1,37 @@
+from __future__ import annotations
+
+import importlib
+import sys
 from pathlib import Path
+from typing import Any, cast
 
 from fastapi.testclient import TestClient
 
-from app.config import Settings
-from app.download_service import issue_download_token
-from app.main import create_app
-from app.repository import (
-    create_book_version,
-    get_email_job,
-    get_download_token_state,
-    get_request,
-    list_admin_events,
-    list_email_jobs,
-)
-from app.worker_service import process_due_email_jobs
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+SettingsModel = cast(Any, importlib.import_module("app.config").Settings)
+issue_download_token = cast(Any, importlib.import_module("app.download_service").issue_download_token)
+create_app = cast(Any, importlib.import_module("app.main").create_app)
+repository = importlib.import_module("app.repository")
+create_book_version = cast(Any, repository.create_book_version)
+get_email_job = cast(Any, repository.get_email_job)
+get_active_book_version = cast(Any, repository.get_active_book_version)
+get_download_token_state = cast(Any, repository.get_download_token_state)
+get_request = cast(Any, repository.get_request)
+list_admin_events = cast(Any, repository.list_admin_events)
+list_book_versions = cast(Any, repository.list_book_versions)
+list_email_jobs = cast(Any, repository.list_email_jobs)
+process_due_email_jobs = cast(Any, importlib.import_module("app.worker_service").process_due_email_jobs)
+connect = cast(Any, importlib.import_module("app.db").connect)
 
 
-def make_settings(database_path: Path) -> Settings:
+def make_settings(database_path: Path) -> Any:
     book_storage_dir = database_path.parent / "books"
-    return Settings(
+    return SettingsModel(
         app_name="Antology API Test",
         app_env="test",
         api_prefix="/api",
@@ -26,8 +39,13 @@ def make_settings(database_path: Path) -> Settings:
         public_base_url="https://antology.test",
         database_path=database_path,
         book_storage_dir=book_storage_dir,
+        expose_api_docs=True,
         download_token_ttl_hours=72,
+        max_book_upload_mb=250,
         delivery_delay_minutes=30,
+        rate_limit_window_minutes=60,
+        rate_limit_max_per_ip=10,
+        rate_limit_max_per_email=3,
         smtp_host="localhost",
         smtp_port=1025,
         smtp_username="",
@@ -73,6 +91,43 @@ def test_healthcheck(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_production_app_disables_public_api_docs_by_default(tmp_path: Path) -> None:
+    database_path = tmp_path / "prod.db"
+    base_settings = make_settings(database_path)
+    production_settings = SettingsModel(
+        app_name=base_settings.app_name,
+        app_env="production",
+        api_prefix=base_settings.api_prefix,
+        cors_origins=base_settings.cors_origins,
+        public_base_url=base_settings.public_base_url,
+        database_path=base_settings.database_path,
+        book_storage_dir=base_settings.book_storage_dir,
+        expose_api_docs=False,
+        download_token_ttl_hours=base_settings.download_token_ttl_hours,
+        max_book_upload_mb=base_settings.max_book_upload_mb,
+        delivery_delay_minutes=base_settings.delivery_delay_minutes,
+        rate_limit_window_minutes=base_settings.rate_limit_window_minutes,
+        rate_limit_max_per_ip=base_settings.rate_limit_max_per_ip,
+        rate_limit_max_per_email=base_settings.rate_limit_max_per_email,
+        smtp_host=base_settings.smtp_host,
+        smtp_port=base_settings.smtp_port,
+        smtp_username=base_settings.smtp_username,
+        smtp_password=base_settings.smtp_password,
+        smtp_from_email=base_settings.smtp_from_email,
+        smtp_use_tls=base_settings.smtp_use_tls,
+        email_max_retries=base_settings.email_max_retries,
+        worker_poll_interval_seconds=base_settings.worker_poll_interval_seconds,
+        admin_email=base_settings.admin_email,
+        admin_password=base_settings.admin_password,
+        secret_key=base_settings.secret_key,
+    )
+    client = TestClient(create_app(production_settings))
+
+    with client:
+        assert client.get("/docs").status_code == 404
+        assert client.get("/openapi.json").status_code == 404
 
 
 def test_request_access_rejects_missing_consent(tmp_path: Path) -> None:
@@ -125,6 +180,9 @@ def test_request_access_creates_electronic_request_and_email_job(tmp_path: Path)
     assert request_row["paper_status"] == "none"
     assert request_row["delivery_token_candidate"] is not None
     assert request_row["updated_at"] == request_row["created_at"]
+    assert request_row["consent_at"] == request_row["created_at"]
+    assert request_row["request_ip"]
+    assert request_row["user_agent"]
 
     email_jobs = list_email_jobs(database_path, payload["request_id"])
     assert len(email_jobs) == 1
@@ -198,6 +256,92 @@ def test_request_access_creates_both_paths(tmp_path: Path) -> None:
     assert email_jobs[0]["recipient_email"] == "elena@example.com"
 
 
+def test_request_access_silently_drops_honeypot_submission(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+
+    with client:
+        response = client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Spam",
+                "last_name": "Bot",
+                "email": "spam@example.com",
+                "purpose": "Need anthology access for an apparently normal request.",
+                "honeypot": "https://spam.invalid",
+                "format": "electronic",
+                "consent": True,
+            },
+        )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["request_id"] == 0
+    assert payload["electronic_status"] == "none"
+    assert payload["paper_status"] == "none"
+    assert get_request(database_path, 1) is None
+
+
+def test_request_access_rate_limits_repeated_email_requests(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+    settings = make_settings(database_path)
+    limited_settings = SettingsModel(
+        app_name=settings.app_name,
+        app_env=settings.app_env,
+        api_prefix=settings.api_prefix,
+        cors_origins=settings.cors_origins,
+        public_base_url=settings.public_base_url,
+        database_path=settings.database_path,
+        book_storage_dir=settings.book_storage_dir,
+        expose_api_docs=settings.expose_api_docs,
+        download_token_ttl_hours=settings.download_token_ttl_hours,
+        max_book_upload_mb=settings.max_book_upload_mb,
+        delivery_delay_minutes=settings.delivery_delay_minutes,
+        rate_limit_window_minutes=settings.rate_limit_window_minutes,
+        rate_limit_max_per_ip=settings.rate_limit_max_per_ip,
+        rate_limit_max_per_email=1,
+        smtp_host=settings.smtp_host,
+        smtp_port=settings.smtp_port,
+        smtp_username=settings.smtp_username,
+        smtp_password=settings.smtp_password,
+        smtp_from_email=settings.smtp_from_email,
+        smtp_use_tls=settings.smtp_use_tls,
+        email_max_retries=settings.email_max_retries,
+        worker_poll_interval_seconds=settings.worker_poll_interval_seconds,
+        admin_email=settings.admin_email,
+        admin_password=settings.admin_password,
+        secret_key=settings.secret_key,
+    )
+    limited_client = TestClient(create_app(limited_settings))
+
+    with limited_client:
+        first = limited_client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Alexey",
+                "last_name": "Morin",
+                "email": "alexey@example.com",
+                "purpose": "Need the anthology for a lecture and reference work.",
+                "format": "electronic",
+                "consent": True,
+            },
+        )
+        second = limited_client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Alexey",
+                "last_name": "Morin",
+                "email": "alexey@example.com",
+                "purpose": "Need the anthology for a lecture and reference work.",
+                "format": "electronic",
+                "consent": True,
+            },
+        )
+
+    assert first.status_code == 201
+    assert second.status_code == 429
+    assert second.json()["detail"] == "Too many requests. Please try again later."
+
+
 def test_download_book_returns_active_book_for_valid_token(tmp_path: Path) -> None:
     client, database_path = make_client(tmp_path)
     settings = make_settings(database_path)
@@ -268,7 +412,6 @@ def test_download_book_rejects_expired_token(tmp_path: Path) -> None:
         request_id=request_id,
     )
 
-    from app.db import connect
 
     with connect(database_path) as connection:
         connection.execute(
@@ -316,7 +459,6 @@ def test_worker_sends_due_electronic_jobs(tmp_path: Path) -> None:
     request_id = response.json()["request_id"]
     email_job_id = response.json()["email_job_id"]
 
-    from app.db import connect
 
     with connect(database_path) as connection:
         connection.execute(
@@ -392,7 +534,7 @@ def test_worker_ignores_future_jobs_until_due(tmp_path: Path) -> None:
 def test_worker_keeps_failure_metadata_for_failed_jobs(tmp_path: Path) -> None:
     client, database_path = make_client(tmp_path)
     settings = make_settings(database_path)
-    settings = Settings(
+    settings = SettingsModel(
         app_name=settings.app_name,
         app_env=settings.app_env,
         api_prefix=settings.api_prefix,
@@ -400,8 +542,13 @@ def test_worker_keeps_failure_metadata_for_failed_jobs(tmp_path: Path) -> None:
         public_base_url=settings.public_base_url,
         database_path=settings.database_path,
         book_storage_dir=settings.book_storage_dir,
+        expose_api_docs=settings.expose_api_docs,
         download_token_ttl_hours=settings.download_token_ttl_hours,
+        max_book_upload_mb=settings.max_book_upload_mb,
         delivery_delay_minutes=settings.delivery_delay_minutes,
+        rate_limit_window_minutes=settings.rate_limit_window_minutes,
+        rate_limit_max_per_ip=settings.rate_limit_max_per_ip,
+        rate_limit_max_per_email=settings.rate_limit_max_per_email,
         smtp_host=settings.smtp_host,
         smtp_port=settings.smtp_port,
         smtp_username=settings.smtp_username,
@@ -431,8 +578,6 @@ def test_worker_keeps_failure_metadata_for_failed_jobs(tmp_path: Path) -> None:
 
     request_id = response.json()["request_id"]
     email_job_id = response.json()["email_job_id"]
-
-    from app.db import connect
 
     with connect(database_path) as connection:
         connection.execute(
@@ -527,7 +672,7 @@ def test_admin_dashboard_shows_counts_and_filterable_requests(tmp_path: Path) ->
                 "consent": True,
             },
         ).json()
-        third = client.post(
+        client.post(
             "/api/request-access",
             json={
                 "first_name": "Review",
@@ -560,8 +705,6 @@ def test_admin_dashboard_shows_counts_and_filterable_requests(tmp_path: Path) ->
                 "consent": True,
             },
         ).json()
-
-        from app.db import connect
 
         with connect(database_path) as connection:
             connection.execute(
@@ -806,8 +949,6 @@ def test_worker_sends_due_paper_pickup_jobs(tmp_path: Path) -> None:
             },
         )
 
-    from app.db import connect
-
     paper_jobs = list_email_jobs(database_path, request_id)
     paper_job_id = paper_jobs[0]["id"]
 
@@ -835,3 +976,140 @@ def test_worker_sends_due_paper_pickup_jobs(tmp_path: Path) -> None:
     email_job = get_email_job(database_path, paper_job_id)
     assert email_job is not None
     assert email_job["status"] == "sent"
+
+
+def test_admin_can_upload_new_pdf_and_make_it_active(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+    settings = make_settings(database_path)
+
+    with client:
+        login_admin(client)
+        response = client.post(
+            "/admin/books/upload",
+            data={
+                "title": "Anthology",
+                "version_label": "v2-2026",
+                "make_active": "on",
+            },
+            files={
+                "book_file": ("anthology-v2.pdf", b"%PDF-1.4\nversion-two\n", "application/pdf"),
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin"
+
+    versions = list_book_versions(database_path)
+    assert len(versions) == 1
+    version = versions[0]
+    assert version["title"] == "Anthology"
+    assert version["version_label"] == "v2-2026"
+    assert version["file_name"] == "anthology-v2.pdf"
+    assert version["file_size"] > 0
+    assert int(version["is_active"]) == 1
+
+    stored_path = settings.book_storage_dir / str(version["file_path"])
+    assert stored_path.exists()
+    assert stored_path.read_bytes() == b"%PDF-1.4\nversion-two\n"
+
+    events = list_admin_events(
+        database_path,
+        entity_type="book_version",
+        entity_id=int(version["id"]),
+    )
+    assert len(events) == 1
+    assert events[0]["event_type"] == "book_uploaded"
+
+
+def test_admin_can_activate_existing_book_version(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+    settings = make_settings(database_path)
+
+    with client:
+        first_id = seed_active_book(database_path)
+        settings.book_storage_dir.mkdir(parents=True, exist_ok=True)
+        second_path = settings.book_storage_dir / "anthology-v2.pdf"
+        second_path.write_bytes(b"%PDF-1.4\nnew-version\n")
+        second_id = create_book_version(
+            database_path,
+            title="Anthology",
+            version_label="v2",
+            file_path="anthology-v2.pdf",
+            file_name="anthology-v2.pdf",
+            file_size=second_path.stat().st_size,
+            checksum="checksum-v2",
+            is_active=False,
+            uploaded_at="2026-06-06T01:00:00+00:00",
+        )
+        login_admin(client)
+        response = client.post(
+            f"/admin/books/{second_id}/activate",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin"
+
+    active_version = get_active_book_version(database_path)
+    assert active_version is not None
+    assert int(active_version["id"]) == second_id
+
+    versions = {int(row["id"]): row for row in list_book_versions(database_path)}
+    assert int(versions[first_id]["is_active"]) == 0
+    assert int(versions[second_id]["is_active"]) == 1
+
+    events = list_admin_events(
+        database_path,
+        entity_type="book_version",
+        entity_id=second_id,
+    )
+    assert any(event["event_type"] == "book_activated" for event in events)
+
+
+def test_new_electronic_request_uses_newly_uploaded_active_book(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+    settings = make_settings(database_path)
+
+    with client:
+        login_admin(client)
+        upload_response = client.post(
+            "/admin/books/upload",
+            data={
+                "title": "Anthology",
+                "version_label": "v3-2026",
+                "make_active": "on",
+            },
+            files={
+                "book_file": ("anthology-v3.pdf", b"%PDF-1.4\nversion-three\n", "application/pdf"),
+            },
+            follow_redirects=False,
+        )
+        assert upload_response.status_code == 303
+
+        request_response = client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Andrei",
+                "last_name": "Mikhailov",
+                "email": "andrei@example.com",
+                "purpose": "Need the current electronic book for a local archive seminar.",
+                "format": "electronic",
+                "consent": True,
+            },
+        )
+
+    request_id = request_response.json()["request_id"]
+    token_result = issue_download_token(
+        database_path,
+        settings,
+        request_id=request_id,
+    )
+    download_response = client.get(f"/download/{token_result.token}")
+
+    assert download_response.status_code == 200
+    assert download_response.content == b"%PDF-1.4\nversion-three\n"
+
+    active_version = get_active_book_version(database_path)
+    assert active_version is not None
+    assert active_version["version_label"] == "v3-2026"

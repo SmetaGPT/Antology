@@ -3,7 +3,7 @@
   "project": {
     "name": "Antology.V2",
     "objective": "Ship a production-ready full-stack landing page with a real lead flow.",
-    "phase": "sprint-6-ready",
+    "phase": "release-blocked",
     "lastUpdated": "2026-06-06",
     "targets": [
       "frontend",
@@ -51,41 +51,25 @@
     }
   },
   "now": {
-    "task": "SPRINT-6",
+    "task": "REL-001",
     "owner": "agent",
-    "status": "active",
-    "next": "Implement book upload and active-version management inside the admin flow.",
+    "status": "blocked",
+    "next": "Resolve final content, legal destinations, and approved media assets before release sign-off.",
     "areas": [
-      "admin"
+      "content",
+      "release"
     ]
   },
   "tasks": {
     "inProgress": [
       {
-        "id": "SPRINT-6",
-        "track": "admin",
-        "title": "Book upload admin flow"
+        "id": "REL-001",
+        "track": "content",
+        "title": "Final content and legal approval"
       }
     ],
-    "next": [
-      {
-        "id": "SPRINT-7",
-        "track": "quality",
-        "title": "Anti-spam, privacy, and content readiness"
-      }
-    ],
-    "later": [
-      {
-        "id": "SPRINT-8",
-        "track": "ops",
-        "title": "Deployment and operations"
-      },
-      {
-        "id": "SPRINT-9",
-        "track": "quality",
-        "title": "Release hardening"
-      }
-    ]
+    "next": [],
+    "later": []
   },
   "blockers": [
     {
@@ -96,16 +80,6 @@
       "ref": [
         ".agent/roadmap.md#content-and-legal-track",
         ".agent/release.md#release-gates"
-      ]
-    },
-    {
-      "id": "BLK-OPS",
-      "sev": "medium",
-      "title": "Python backend deploy target is undefined",
-      "next": "Choose the hosting/runtime model, env contract, and secret handling for the Python API.",
-      "ref": [
-        ".agent/roadmap.md#ops-track",
-        ".agent/decisions.md#decision-log"
       ]
     }
   ],

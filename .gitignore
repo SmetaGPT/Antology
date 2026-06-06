@@ -27,3 +27,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 backend/data/*.db
+.env.production
+backend/.env.production
+runtime/
+ops-backups/
+backend/backups/

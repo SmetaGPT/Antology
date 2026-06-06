@@ -3,26 +3,25 @@
 ## Verdict
 
 - Current verdict: `not ready`
-- Reason: the project is still a prototype with no real backend submission path,
-  incomplete legal/content assets, and no deployment target for the Python API.
+- Reason: engineering release hardening is in place, but final approved
+    contacts, legal destinations, and media assets are still incomplete.
 
 ## Release Gates
 
 | Gate | Status | Notes |
 | --- | --- | --- |
-| Frontend content integrity | blocked | Placeholder contacts and dead legal links remain. |
-| Backend submission flow | in progress | Python backend bootstrap is being added, but the frontend is not wired yet. |
-| SEO baseline | blocked | Vite defaults and missing share/search assets remain. |
-| Accessibility baseline | blocked | Form semantics and interaction polish still need work. |
-| Environment/deploy model | blocked | No production target is selected yet for the Python API. |
-| Monitoring/observability | blocked | No runtime logging or failure path has been chosen. |
+| Frontend content integrity | blocked | Final approved contacts, legal destinations, and media assets are still pending. |
+| Backend submission flow | ready | Request intake, download tokens, worker email flow, admin review, and book upload are covered by backend smoke tests. |
+| SEO baseline | in progress | Core metadata and legal pages exist, but approved share/search assets still need final confirmation. |
+| Accessibility baseline | in progress | No failing release command remains, but a focused accessibility pass is still advisable before ship. |
+| Environment/deploy model | ready | Compose-based production-like runtime, reverse proxy, bind-mounted persistence, backup command, and env contract are documented. |
+| Monitoring/observability | in progress | Structured JSON logs now exist for app and worker runtime, but no aggregation or alerting is configured yet. |
 
 ## Required For First Production Release
 
 - Final content, contacts, and legal destinations.
-- Working form backend with validation and persistence.
-- Clear hosting/runtime decision and environment setup.
-- Focused release checks for build, lint, typecheck, and core flow behavior.
+- Approved media/share assets for the public launch.
+- Ongoing confirmation that `npm run release:check` stays green.
 
 ## Escalate Here When
 
