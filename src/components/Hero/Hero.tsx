@@ -1,4 +1,5 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
+import { ArrowRight, BookOpen } from 'lucide-react';
 import { useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -14,6 +15,7 @@ export function Hero() {
   const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   const isDark = theme === 'dark';
+  const heroBackgroundSrc = isDark ? '/mainpage-dark.png' : '/mainpage-light.png';
 
   return (
     <section
@@ -29,109 +31,218 @@ export function Hero() {
       >
         {/* Historical map image */}
         <img
-          src="/mainpage.png"
+          src={heroBackgroundSrc}
           alt="Историческая карта России"
-          className="absolute inset-0 w-full h-full object-cover object-center"
+          className="absolute inset-0 w-full h-full object-cover object-center brightness-110"
+          onError={(event) => {
+            const fallback = '/mainpage.png';
+            if (event.currentTarget.getAttribute('src') !== fallback) {
+              event.currentTarget.setAttribute('src', fallback);
+            }
+          }}
         />
 
         {isDark ? (
           <>
             {/* Dark: vignette edges + strong central dimming zone */}
             <div className="absolute inset-0 vignette" />
-            <div className="absolute inset-0 bg-gradient-to-b from-graphite-950/70 via-graphite-950/50 to-graphite-950/95" />
+            <div className="absolute inset-0 bg-gradient-to-b from-graphite-950/74 via-graphite-950/54 to-graphite-950/96" />
             {/* Central radial shadow so map details still peek through at edges */}
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 75% 65% at 50% 48%, rgba(10,10,10,0.55) 0%, transparent 100%)' }} />
+            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 75% 65% at 50% 48%, rgba(10,10,10,0.60) 0%, transparent 100%)' }} />
           </>
         ) : (
           <>
             {/* Light: strong white-cream central glow + heavy bottom fade */}
-            <div className="absolute inset-0 bg-gradient-to-b from-lightBg/65 via-lightBg/30 to-lightBg/92" />
-            <div className="absolute inset-0 bg-gradient-to-t from-lightBg/80 via-transparent to-lightBg/50" />
+            <div className="absolute inset-0 bg-gradient-to-b from-lightBg/70 via-lightBg/35 to-lightBg/94" />
+            <div className="absolute inset-0 bg-gradient-to-t from-lightBg/84 via-transparent to-lightBg/55" />
             {/* Cream radial overlay to brighten the text area */}
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 75% 65% at 50% 48%, rgba(248,245,240,0.72) 0%, transparent 100%)' }} />
+            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 75% 65% at 50% 48%, rgba(248,245,240,0.78) 0%, transparent 100%)' }} />
           </>
         )}
       </motion.div>
 
       {/* Content */}
-      <motion.div
-        style={{ opacity }}
-        className="relative z-10 section-container text-center px-4"
-      >
-        {/* Main Title */}
-        <motion.h1
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className={`font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl mb-6 leading-tight ${
-            isDark ? 'hero-text-shadow' : 'hero-text-shadow-light'
-          }`}
-        >
-          <span className={`block ${isDark ? 'text-ivory-50' : 'text-graphite-950'}`}>
-            Антология
-          </span>
-          <span className={`block mt-2 ${isDark ? 'text-ivory-100' : 'text-gold-900'}`}>
-            «Исторические города и сёла России»
-          </span>
-        </motion.h1>
-
-        {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className={`text-base sm:text-lg max-w-2xl mx-auto mb-10 ${
-            isDark ? 'text-ivory-200 hero-text-shadow' : 'text-graphite-900 hero-text-shadow-light'
-          }`}
-        >
-          Цифровой атлас градостроительной памяти России.
-        </motion.p>
-
-        {/* Gold Divider */}
+      {isDark ? (
         <motion.div
-          initial={{ opacity: 0, scaleX: 0 }}
-          animate={{ opacity: 1, scaleX: 1 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className="gold-divider mx-auto mb-10"
-        />
-
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+          style={{ opacity }}
+          className="relative z-10 section-container w-full pt-28 sm:pt-32 lg:pt-36 pb-14"
         >
-          <a href="#request-form" className="btn-primary w-full sm:w-auto">
-            Запросить электронный доступ
-          </a>
-          <a href="#request-form" className="btn-secondary w-full sm:w-auto">
-            Подать заявку на бумажный комплект
-          </a>
-        </motion.div>
+          <div className="max-w-2xl">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="text-[13px] sm:text-sm font-semibold tracking-[0.16em] uppercase text-gold-400/90"
+            >
+              Цифровой атлас градостроительной памяти
+            </motion.p>
 
-        {/* Scroll Indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.9 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2"
-        >
-          <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-            className={`w-6 h-10 border rounded-full flex justify-center pt-2 transition-colors ${
-              isDark ? 'border-ivory-300/30' : 'border-gold-700/40'
-            }`}
-          >
-            <div
-              className={`w-1 h-2 rounded-full ${
-                isDark ? 'bg-gold-400/60' : 'bg-gold-700/60'
-              }`}
+            <motion.div
+              initial={{ opacity: 0, scaleX: 0 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mt-3 mb-8 h-px w-28 bg-gold-500/35 origin-left"
             />
-          </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.25 }}
+              className="font-serif text-5xl sm:text-6xl lg:text-7xl text-ivory-50 leading-[0.96] hero-text-shadow"
+            >
+              Антология
+              <br />
+              «Исторические города&nbsp;и&nbsp;сёла
+              <br />
+              России»
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.35 }}
+              className="mt-7 text-lg sm:text-xl text-ivory-200/90 leading-relaxed max-w-xl hero-text-shadow"
+            >
+              Многотомное издание о городах, сёлах, архитектуре и пространственной памяти России.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              className="mt-10 flex flex-wrap items-end gap-x-10 gap-y-5"
+            >
+              <div>
+                <div className="font-serif text-5xl text-gold-400">10</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.11em] text-ivory-300/80">томов</div>
+              </div>
+              <div className="h-14 w-px bg-gold-500/30" />
+              <div>
+                <div className="font-serif text-5xl text-gold-400">13</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.11em] text-ivory-300/80">книг</div>
+              </div>
+              <div className="h-14 w-px bg-gold-500/30" />
+              <div>
+                <div className="font-serif text-5xl text-gold-400">6200+</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.11em] text-ivory-300/80">исторических населенных пунктов</div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.55 }}
+              className="mt-10 flex flex-wrap items-center gap-6"
+            >
+              <a
+                href="#request-form"
+                className="inline-flex items-center gap-2 rounded-sm bg-gold-500 px-7 py-4 text-base font-semibold text-graphite-950 transition-all duration-300 hover:bg-gold-400 hover:shadow-lg"
+              >
+                <BookOpen size={18} />
+                Запросить электронную копию
+              </a>
+
+              <a
+                href="#about"
+                className="inline-flex items-center gap-2 border-b border-ivory-100/30 px-1 py-3 text-base font-semibold text-ivory-100 transition-colors duration-300 hover:border-gold-400 hover:text-gold-300"
+              >
+                О проекте
+                <ArrowRight size={18} />
+              </a>
+            </motion.div>
+          </div>
         </motion.div>
-      </motion.div>
+      ) : (
+        <motion.div
+          style={{ opacity }}
+          className="relative z-10 section-container w-full pt-28 sm:pt-32 lg:pt-36 pb-14"
+        >
+          <div className="max-w-2xl">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="text-[13px] sm:text-sm font-semibold tracking-[0.16em] uppercase text-gold-800/85"
+            >
+              Цифровой атлас градостроительной памяти
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, scaleX: 0 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mt-3 mb-8 h-px w-28 bg-gold-700/35 origin-left"
+            />
+
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.25 }}
+              className="font-serif text-5xl sm:text-6xl lg:text-7xl text-graphite-900 leading-[0.96]"
+            >
+              Антология
+              <br />
+              «Исторические города&nbsp;и&nbsp;сёла
+              <br />
+              России»
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.35 }}
+              className="mt-7 text-lg sm:text-xl text-lightTextSecondary leading-relaxed max-w-xl"
+            >
+              Многотомное издание о городах, сёлах, архитектуре и пространственной памяти России.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              className="mt-10 flex flex-wrap items-end gap-x-10 gap-y-5"
+            >
+              <div>
+                <div className="font-serif text-5xl text-gold-800">10</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.11em] text-lightTextSecondary/90">томов</div>
+              </div>
+              <div className="h-14 w-px bg-gold-700/25" />
+              <div>
+                <div className="font-serif text-5xl text-gold-800">13</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.11em] text-lightTextSecondary/90">книг</div>
+              </div>
+              <div className="h-14 w-px bg-gold-700/25" />
+              <div>
+                <div className="font-serif text-5xl text-gold-800">6200+</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.11em] text-lightTextSecondary/90">исторических населенных пунктов</div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.55 }}
+              className="mt-10 flex flex-wrap items-center gap-6"
+            >
+              <a
+                href="#request-form"
+                className="inline-flex items-center gap-2 rounded-sm bg-gold-700 px-7 py-4 text-base font-semibold text-ivory-50 transition-all duration-300 hover:bg-gold-600 hover:shadow-lg"
+              >
+                <BookOpen size={18} />
+                Запросить электронную копию
+              </a>
+
+              <a
+                href="#about"
+                className="inline-flex items-center gap-2 border-b border-graphite-900/25 px-1 py-3 text-base font-semibold text-graphite-900 transition-colors duration-300 hover:border-gold-700 hover:text-gold-800"
+              >
+                О проекте
+                <ArrowRight size={18} />
+              </a>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Decorative Gold Lines */}
       <div className={`absolute top-0 left-0 w-full h-px bg-gradient-to-r ${

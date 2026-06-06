@@ -134,7 +134,7 @@
 
   /* Form Fields */
   .input-field {
-    @apply w-full border rounded-sm px-4 py-3 font-sans placeholder:transition-colors duration-200 focus:outline-none focus:border-gold-600 focus:ring-1 focus:ring-gold-600/50 transition-all duration-200;
+    @apply w-full border rounded-sm px-4 py-3 font-sans placeholder:transition-colors focus:outline-none focus:border-gold-600 focus:ring-1 focus:ring-gold-600/50 transition-all duration-200;
   }
 
   .input-field {
@@ -156,6 +156,65 @@
 
   html.dark .image-placeholder {
     @apply from-graphite-800 to-graphite-900;
+  }
+
+  /* Editorial Decorative Frame */
+  .editorial-frame {
+    @apply relative border p-3 sm:p-4;
+  }
+
+  .editorial-frame::before,
+  .editorial-frame::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  .editorial-frame::before {
+    top: -6px;
+  }
+
+  .editorial-frame::after {
+    bottom: -6px;
+  }
+
+  .editorial-frame-inner {
+    @apply border p-3 sm:p-4;
+  }
+
+  .editorial-frame-light {
+    border-color: rgba(167, 119, 57, 0.45);
+    background: rgba(245, 236, 218, 0.18);
+  }
+
+  .editorial-frame-light::before,
+  .editorial-frame-light::after {
+    border: 1px solid rgba(167, 119, 57, 0.55);
+    background: rgba(248, 245, 240, 0.95);
+  }
+
+  .editorial-frame-light .editorial-frame-inner {
+    border-color: rgba(167, 119, 57, 0.5);
+    background: rgba(252, 248, 241, 0.3);
+  }
+
+  .editorial-frame-dark {
+    border-color: rgba(217, 170, 91, 0.45);
+    background: rgba(12, 15, 22, 0.6);
+  }
+
+  .editorial-frame-dark::before,
+  .editorial-frame-dark::after {
+    border: 1px solid rgba(217, 170, 91, 0.6);
+    background: rgba(9, 12, 18, 0.95);
+  }
+
+  .editorial-frame-dark .editorial-frame-inner {
+    border-color: rgba(217, 170, 91, 0.42);
+    background: rgba(9, 12, 18, 0.55);
   }
 }
 

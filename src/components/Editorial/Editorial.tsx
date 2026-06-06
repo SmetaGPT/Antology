@@ -7,7 +7,7 @@ import { ImagePlaceholder } from '../ui/ImagePlaceholder';
 export function Editorial() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: '-100px' });
-  const { isDark, sectionBg, textPrimary, textSecondary } = useThemeStyles();
+  const { isDark, sectionBg, textPrimary } = useThemeStyles();
 
   return (
     <section
@@ -26,31 +26,40 @@ export function Editorial() {
           className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
         >
           {/* Text Content */}
-          <div className="order-2 lg:order-1">
-            <motion.span
+          <div className="order-2 lg:order-1 max-w-[640px]">
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className={`museum-label block mb-4 ${isDark ? 'text-ivory-400/70' : 'text-gold-800'}`}
             >
-              О проекте
-            </motion.span>
+              <span className={`museum-label block ${isDark ? 'text-gold-400/90' : 'text-gold-800/90'}`}>
+                О проекте
+              </span>
+              <div className={`mt-3 relative h-px w-24 ${isDark ? 'bg-gold-500/45' : 'bg-gold-700/45'}`}>
+                <span className={`absolute -right-1 -top-[3px] h-1.5 w-1.5 rotate-45 ${isDark ? 'bg-gold-500/70' : 'bg-gold-700/70'}`} />
+              </div>
+            </motion.div>
 
             <motion.h2
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className={`font-serif text-3xl sm:text-4xl md:text-5xl ${textPrimary} mb-8 leading-tight`}
+              className={`font-serif text-5xl sm:text-6xl ${textPrimary} mb-8 leading-[1.02]`}
             >
-              Не просто издание —{' '}
-              <span className={isDark ? 'text-gold-400' : 'text-gold-700'}>архитектурная летопись страны</span>
+              Не просто издание —
+              <span className={`block ${isDark ? 'text-gold-400' : 'text-gold-700'}`}>
+                архитектурная летопись
+              </span>
+              <span className={`block ${isDark ? 'text-gold-400' : 'text-gold-700'}`}>
+                страны
+              </span>
             </motion.h2>
 
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className={`text-lg ${isDark ? 'text-ivory-200/80' : 'text-lightTextSecondary/90'} leading-relaxed mb-6`}
+              className={`text-lg sm:text-xl ${isDark ? 'text-ivory-200/88' : 'text-lightTextSecondary/95'} leading-relaxed mb-6`}
             >
               Антология собирает воедино историю городов и сёл России и показывает, как через
               расселение, архитектуру, планировку, храмы, крепости, улицы и площади
@@ -61,7 +70,7 @@ export function Editorial() {
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className={`text-base leading-relaxed ${textSecondary}`}
+              className={`text-base sm:text-lg leading-relaxed ${isDark ? 'text-ivory-200/82' : 'text-lightTextSecondary/90'}`}
             >
               Это уникальное издание представляет собой историко-градостроительный атлас,
               охватывающий территорию современной России и documenting более шести тысяч
@@ -74,7 +83,7 @@ export function Editorial() {
               initial={{ opacity: 0, scaleX: 0 }}
               animate={isInView ? { opacity: 1, scaleX: 1 } : {}}
               transition={{ duration: 0.8, delay: 0.5 }}
-              className="gold-divider mt-8"
+              className={`mt-9 h-px w-36 ${isDark ? 'bg-gold-500/55' : 'bg-gold-700/55'}`}
             />
           </div>
 
@@ -85,23 +94,27 @@ export function Editorial() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="order-1 lg:order-2"
           >
-            <div className="relative">
-              {/* Frame */}
-              <div className={`absolute -inset-4 border rounded-sm ${isDark ? 'border-gold-500/20' : 'border-gold-700/40'}`} />
-              <div className={`absolute -inset-8 border rounded-sm ${isDark ? 'border-gold-500/10' : 'border-gold-700/20'}`} />
-
-              <ImagePlaceholder
-                src="/images/book-spread.jpg"
-                alt="Книжный разворот Антологии"
-                aspectRatio="portrait"
-                className="rounded-sm shadow-museum"
-                overlayText="Книжный разворот"
-              />
+            <div className={`editorial-frame ${isDark ? 'editorial-frame-dark' : 'editorial-frame-light'}`}>
+              <div className="editorial-frame-inner">
+                <ImagePlaceholder
+                  src="/images/book-spread.jpg"
+                  alt="Книжный разворот Антологии"
+                  aspectRatio="square"
+                  className="rounded-none"
+                  overlayText="Книжный разворот"
+                />
+              </div>
 
               {/* Museum label */}
               <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                <span className={`text-xs tracking-[0.15em] uppercase ${isDark ? 'text-ivory-400/50' : 'text-gold-700/60'}`}>
+                <span className={`text-xs tracking-[0.16em] uppercase ${isDark ? 'text-gold-400/70' : 'text-gold-800/70'}`}>
+                  •
+                </span>
+                <span className={`mx-3 text-xs tracking-[0.16em] uppercase ${isDark ? 'text-gold-400/70' : 'text-gold-800/70'}`}>
                   Цифровой историко-градостроительный атлас
+                </span>
+                <span className={`text-xs tracking-[0.16em] uppercase ${isDark ? 'text-gold-400/70' : 'text-gold-800/70'}`}>
+                  •
                 </span>
               </div>
             </div>

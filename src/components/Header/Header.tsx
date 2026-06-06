@@ -115,7 +115,7 @@ export function Header() {
                     : 'border-lightAccent/30 hover:border-lightAccent'
                 }`}
               >
-                Запросить доступ
+                Запросить копию
               </a>
             </div>
 
@@ -170,7 +170,7 @@ export function Header() {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="btn-primary mt-2"
                 >
-                  Запросить доступ
+                  Запросить копию
                 </a>
               </div>
             </div>

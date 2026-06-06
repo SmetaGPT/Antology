@@ -27,6 +27,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 backend/data/*.db
+backend/backend/data/*.db*
 .env.production
 backend/.env.production
 runtime/
