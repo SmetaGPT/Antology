@@ -2,6 +2,7 @@ import { motion, useInView } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { Check, AlertCircle, Send } from 'lucide-react';
 import { useThemeStyles } from '../../hooks/useThemeStyles';
+import { buildApiUrl } from '../../config/api';
 
 interface FormData {
   firstName: string;
@@ -21,6 +22,7 @@ interface FormErrors {
   email?: string;
   purpose?: string;
   consent?: string;
+  submit?: string;
 }
 
 const initialFormData: FormData = {
@@ -41,6 +43,7 @@ export function RequestForm() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -71,13 +74,54 @@ export function RequestForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (validateForm()) {
-      // TODO: connect to API endpoint /api/anthology/request-access
-      console.log('Form submitted:', formData);
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrors((prev) => ({ ...prev, submit: undefined }));
+
+    try {
+      const response = await fetch(buildApiUrl('/api/request-access'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          first_name: formData.firstName.trim(),
+          last_name: formData.lastName.trim(),
+          organization: formData.organization.trim() || null,
+          position: formData.position.trim() || null,
+          email: formData.email.trim(),
+          phone: formData.phone.trim() || null,
+          purpose: formData.purpose.trim(),
+          format: formData.format,
+          consent: formData.consent,
+        }),
+      });
+
+      if (!response.ok) {
+        const fallbackMessage =
+          response.status === 422
+            ? 'Проверьте правильность заполнения полей формы.'
+            : 'Не удалось отправить заявку. Попробуйте ещё раз.';
+
+        throw new Error(fallbackMessage);
+      }
+
       setIsSubmitted(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Не удалось отправить заявку. Попробуйте ещё раз.';
+
+      setErrors((prev) => ({ ...prev, submit: message }));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -92,10 +136,11 @@ export function RequestForm() {
       [name]: type === 'checkbox' ? checked : value,
     }));
 
-    // Clear error when user starts typing
-    if (errors[name as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
+    setErrors((prev) => ({
+      ...prev,
+      [name]: undefined,
+      submit: undefined,
+    }));
   };
 
   const { isDark, textPrimary } = useThemeStyles();
@@ -123,13 +168,14 @@ export function RequestForm() {
             <p className={`text-lg mb-8 ${isDark ? 'text-ivory-300/80' : 'text-lightTextSecondary/80'}`}>
               После рассмотрения мы свяжемся с вами и направим информацию о доступе.
             </p>
-            <button
-              onClick={() => {
-                setIsSubmitted(false);
-                setFormData(initialFormData);
-              }}
-              className="btn-secondary"
-            >
+              <button
+                onClick={() => {
+                  setIsSubmitted(false);
+                  setFormData(initialFormData);
+                  setErrors({});
+                }}
+                className="btn-secondary"
+              >
               Отправить ещё одну заявку
             </button>
           </motion.div>
@@ -401,9 +447,21 @@ export function RequestForm() {
 
             {/* Submit */}
             <div className="pt-4">
-              <button type="submit" className="btn-primary w-full sm:w-auto group">
+              {errors.submit && (
+                <p className="mb-4 text-sm text-burgundy-400 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.submit}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`btn-primary w-full sm:w-auto group ${
+                  isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
+              >
                 <Send className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform" />
-                Отправить заявку
+                {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
               </button>
             </div>
           </motion.form>

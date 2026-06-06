@@ -8,7 +8,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "agent:sync": "node scripts/agent/sync-snapshot.mjs",
+    "agent:validate": "node scripts/agent/validate-state.mjs",
+    "agent:estimate": "node scripts/agent/estimate-startup.mjs",
+    "agent:classify": "node scripts/agent/classify-startup.mjs",
+    "agent:check": "npm run agent:sync && npm run agent:validate && npm run agent:estimate"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

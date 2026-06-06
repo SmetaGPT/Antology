@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Antology.V2",
+    "objective": "Ship a production-ready full-stack landing page with a real lead flow.",
+    "phase": "sprint-5-ready",
+    "lastUpdated": "2026-06-06",
+    "targets": [
+      "frontend",
+      "backend",
+      "ops",
+      "content"
+    ]
+  },
+  "startup": {
+    "defaultBundle": [
+      ".agent/state.json",
+      ".agent/snapshot.md"
+    ],
+    "bundles": {
+      "snapshot-only": [
+        ".agent/snapshot.md"
+      ],
+      "hot-only": [
+        ".agent/state.json"
+      ],
+      "full-state": [
+        ".agent/state.json",
+        ".agent/snapshot.md",
+        ".agent/roadmap.md",
+        ".agent/release.md",
+        ".agent/decisions.md"
+      ],
+      "release": [
+        ".agent/state.json",
+        ".agent/snapshot.md",
+        ".agent/release.md"
+      ],
+      "architecture": [
+        ".agent/state.json",
+        ".agent/snapshot.md",
+        ".agent/decisions.md"
+      ]
+    },
+    "paths": {
+      "local-fast-path": "snapshot-only",
+      "cross-module": "default",
+      "resume": "default",
+      "release": "release",
+      "architecture": "architecture"
+    }
+  },
+  "now": {
+    "task": "SPRINT-5",
+    "owner": "agent",
+    "status": "active",
+    "next": "Implement paper request review actions, admin event logging, and approval or rejection email jobs.",
+    "areas": [
+      "admin"
+    ]
+  },
+  "tasks": {
+    "inProgress": [
+      {
+        "id": "SPRINT-5",
+        "track": "admin",
+        "title": "Paper edition review flow"
+      }
+    ],
+    "next": [
+      {
+        "id": "SPRINT-6",
+        "track": "admin",
+        "title": "Book upload admin flow"
+      }
+    ],
+    "later": [
+      {
+        "id": "SPRINT-7",
+        "track": "quality",
+        "title": "Anti-spam, privacy, and content readiness"
+      },
+      {
+        "id": "SPRINT-8",
+        "track": "ops",
+        "title": "Deployment and operations"
+      },
+      {
+        "id": "SPRINT-9",
+        "track": "quality",
+        "title": "Release hardening"
+      }
+    ]
+  },
+  "blockers": [
+    {
+      "id": "BLK-002",
+      "sev": "high",
+      "title": "Production content and legal assets are incomplete",
+      "next": "Provide final contacts, legal targets, and approved media assets.",
+      "ref": [
+        ".agent/roadmap.md#content-and-legal-track",
+        ".agent/release.md#release-gates"
+      ]
+    },
+    {
+      "id": "BLK-OPS",
+      "sev": "medium",
+      "title": "Python backend deploy target is undefined",
+      "next": "Choose the hosting/runtime model, env contract, and secret handling for the Python API.",
+      "ref": [
+        ".agent/roadmap.md#ops-track",
+        ".agent/decisions.md#decision-log"
+      ]
+    }
+  ],
+  "canon": {
+    "now": ".agent/state.json",
+    "startup": ".agent/snapshot.md",
+    "remaining": "docs/roadmap-lean-production.md",
+    "release": ".agent/release.md",
+    "decisions": ".agent/decisions.md"
+  }
+}
