@@ -62,16 +62,19 @@ def process_due_email_jobs(
         processed_count += 1
 
         try:
-            if job["kind"] != "electronic_link":
+            if job["kind"] == "electronic_link":
+                token_result = issue_download_token(
+                    database_path,
+                    settings,
+                    request_id=int(job["request_id"]),
+                )
+                download_link = _build_download_link(settings, token_result.token)
+                subject, body = _render_electronic_link_email(download_link)
+            elif job["kind"] in {"paper_pickup", "paper_rejected"}:
+                subject = str(job["subject"])
+                body = str(job["body"])
+            else:
                 raise ValueError(f"Unsupported email job kind: {job['kind']}")
-
-            token_result = issue_download_token(
-                database_path,
-                settings,
-                request_id=int(job["request_id"]),
-            )
-            download_link = _build_download_link(settings, token_result.token)
-            subject, body = _render_electronic_link_email(download_link)
 
             sender.send(
                 EmailPayload(

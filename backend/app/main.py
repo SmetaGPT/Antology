@@ -19,7 +19,8 @@ from .admin_service import (
 from .config import Settings, get_settings
 from .db import init_database
 from .download_service import resolve_download
-from .repository import get_request
+from .paper_review_service import apply_paper_decision
+from .repository import get_request, list_admin_events
 from .request_access_service import create_request_access
 from .schemas import RequestAccessPayload, RequestAccessResponse
 
@@ -102,7 +103,12 @@ def _render_dashboard_page(
     )
 
 
-def _render_request_detail_page(request_row: object) -> str:
+def _render_request_detail_page(
+    request_row: object,
+    *,
+    events: list[object],
+    error_message: str | None = None,
+) -> str:
     assert request_row is not None
     fields = [
         ("ID", request_row["id"]),
@@ -116,6 +122,8 @@ def _render_request_detail_page(request_row: object) -> str:
         ("Format", request_row["format"]),
         ("Electronic status", request_row["electronic_status"]),
         ("Paper status", request_row["paper_status"]),
+        ("Paper pickup info", request_row["paper_pickup_info"] or ""),
+        ("Paper admin note", request_row["paper_admin_note"] or ""),
         ("Created", request_row["created_at"]),
         ("Updated", request_row["updated_at"]),
     ]
@@ -123,14 +131,59 @@ def _render_request_detail_page(request_row: object) -> str:
         f"<tr><th align='left'>{escape(str(label))}</th><td>{escape(str(value))}</td></tr>"
         for label, value in fields
     )
+    error_html = ""
+    if error_message:
+        error_html = f"<p style='color:#b42318;'>{escape(error_message)}</p>"
+
+    decision_form_html = ""
+    if str(request_row["paper_status"]) == "review":
+        decision_form_html = (
+            "<section style='margin:24px 0;'>"
+            "<h2>Paper review</h2>"
+            "<form method='post' action='/admin/requests/"
+            f"{request_row['id']}"
+            "/paper-decision' style='display:grid;gap:12px;'>"
+            "<label>Decision<br>"
+            "<select name='decision'>"
+            "<option value='approve'>Approve</option>"
+            "<option value='reject'>Reject</option>"
+            "</select></label>"
+            "<label>Pickup information<br>"
+            "<textarea name='pickup_info' rows='4' style='width:100%;'></textarea></label>"
+            "<label>Admin note<br>"
+            "<textarea name='admin_note' rows='4' style='width:100%;'></textarea></label>"
+            "<button type='submit' style='width:max-content;'>Save decision</button>"
+            "</form>"
+            "<p>Approval requires pickup information. Rejection requires an admin note.</p>"
+            "</section>"
+        )
+
+    events_html = "".join(
+        (
+            "<tr>"
+            f"<td>{escape(str(event['created_at']))}</td>"
+            f"<td>{escape(str(event['event_type']))}</td>"
+            f"<td>{escape(str(event['metadata_json'] or ''))}</td>"
+            "</tr>"
+        )
+        for event in events
+    )
+    if not events_html:
+        events_html = "<tr><td colspan='3'>No admin events yet.</td></tr>"
 
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
         f"<title>Request {request_row['id']}</title></head><body>"
         "<main style='max-width:800px;margin:32px auto;font-family:Arial,sans-serif;'>"
         f"<p><a href='/admin'>Back to dashboard</a></p><h1>Request #{request_row['id']}</h1>"
+        f"{error_html}"
         "<table border='1' cellpadding='8' cellspacing='0' style='width:100%;border-collapse:collapse;'>"
-        f"{rows_html}</table></main></body></html>"
+        f"{rows_html}</table>"
+        f"{decision_form_html}"
+        "<section><h2>Admin events</h2>"
+        "<table border='1' cellpadding='8' cellspacing='0' style='width:100%;border-collapse:collapse;'>"
+        "<thead><tr><th>Created</th><th>Event</th><th>Metadata</th></tr></thead>"
+        f"<tbody>{events_html}</tbody></table></section></main></body></html>"
     )
 
 
@@ -258,7 +311,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if request_row is None:
             raise HTTPException(status_code=404, detail="Request was not found")
 
-        return HTMLResponse(_render_request_detail_page(request_row))
+        events = list_admin_events(
+            app_settings.database_path,
+            entity_type="request",
+            entity_id=request_id,
+        )
+        return HTMLResponse(_render_request_detail_page(request_row, events=events))
+
+    @app.post("/admin/requests/{request_id}/paper-decision")
+    async def admin_paper_decision(request: Request, request_id: int):
+        admin_user = require_admin_user(request, app_settings.database_path, app_settings)
+        form_data = parse_qs((await request.body()).decode("utf-8"))
+        decision = str(form_data.get("decision", [""])[0]).strip().lower()
+        pickup_info = str(form_data.get("pickup_info", [""])[0])
+        admin_note = str(form_data.get("admin_note", [""])[0])
+
+        try:
+            apply_paper_decision(
+                app_settings.database_path,
+                admin_user_id=int(admin_user["id"]),
+                request_id=request_id,
+                decision=decision,
+                pickup_info=pickup_info,
+                admin_note=admin_note,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            request_row = get_request(app_settings.database_path, request_id)
+            if request_row is None:
+                raise HTTPException(status_code=404, detail="Request was not found") from error
+            events = list_admin_events(
+                app_settings.database_path,
+                entity_type="request",
+                entity_id=request_id,
+            )
+            return HTMLResponse(
+                _render_request_detail_page(
+                    request_row,
+                    events=events,
+                    error_message=str(error),
+                ),
+                status_code=400,
+            )
+
+        return RedirectResponse(url=f"/admin/requests/{request_id}", status_code=303)
 
     return app
 

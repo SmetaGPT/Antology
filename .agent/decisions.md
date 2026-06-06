@@ -78,8 +78,21 @@
 - Decision: the first admin surface stays server-rendered inside the FastAPI
   app and uses a small signed cookie session.
 - Shape:
-  - bootstrap admin user seeded from environment
-  - hashed password stored in `admin_users`
-  - `/admin` dashboard and request detail pages rendered without a separate SPA
+- bootstrap admin user seeded from environment
+- hashed password stored in `admin_users`
+- `/admin` dashboard and request detail pages rendered without a separate SPA
 - Why: the admin workflow is still narrow, and a server-rendered panel keeps the
   operational footprint lower than introducing a second frontend application.
+
+### DEC-008
+
+- Status: accepted
+- Decision: paper-edition decisions are handled as state transitions on the
+  existing request row, with follow-up email jobs and append-only admin events.
+- Shape:
+  - `paper_status` moves from `review` to `approved` or `rejected`
+  - approval stores pickup information, rejection stores an admin note
+  - admin actions enqueue `paper_pickup` or `paper_rejected` email jobs
+  - each decision writes an `admin_events` audit row
+- Why: the printed-edition flow is operationally small, but it still needs
+  durable review state, traceability, and delayed outbound email handling.

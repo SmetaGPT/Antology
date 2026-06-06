@@ -1,25 +1,24 @@
 <!-- generated: run npm run agent:sync -->
 <!-- source: .agent/state.json -->
-<!-- generatedAt: 2026-06-06T16:16:43.042Z -->
+<!-- generatedAt: 2026-06-06T16:24:11.475Z -->
 
 # Agent Startup
 
 - Goal: Ship a production-ready full-stack landing page with a real lead flow.
-- Phase: `sprint-5-ready`
+- Phase: `sprint-6-ready`
 - Default: `.agent/state.json` -> `.agent/snapshot.md`
 
 ## Now
-- [`SPRINT-5`] Paper edition review flow (admin)
+- [`SPRINT-6`] Book upload admin flow (admin)
 - Owner: `agent`
 - Status: `active`
-- Next: Implement paper request review actions, admin event logging, and approval or rejection email jobs.
+- Next: Implement book upload and active-version management inside the admin flow.
 - Areas: `admin`
 
 ## Next
-- [`SPRINT-6`] Book upload admin flow (admin)
+- [`SPRINT-7`] Anti-spam, privacy, and content readiness (quality)
 
 ## Later
-- [`SPRINT-7`] Anti-spam, privacy, and content readiness (quality)
 - [`SPRINT-8`] Deployment and operations (ops)
 - [`SPRINT-9`] Release hardening (quality)
 

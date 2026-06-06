@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+import json
 from pathlib import Path
 import sqlite3
 
@@ -52,10 +53,12 @@ def create_request(
                 consent,
                 electronic_status,
                 paper_status,
+                paper_pickup_info,
+                paper_admin_note,
                 delivery_token_candidate,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 request_payload["first_name"],
@@ -69,6 +72,8 @@ def create_request(
                 1 if request_payload["consent"] else 0,
                 electronic_status,
                 paper_status,
+                None,
+                None,
                 delivery_token_candidate,
                 created_at,
                 updated_at,
@@ -509,3 +514,130 @@ def list_requests_for_admin(
 
     with connect(database_path) as connection:
         return connection.execute(query, values).fetchall()
+
+
+def create_email_job(
+    database_path: Path,
+    *,
+    request_id: int,
+    kind: str,
+    recipient_email: str,
+    subject: str,
+    body: str,
+    status: str,
+    send_after: str,
+    created_at: str,
+) -> int:
+    with connect(database_path) as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO email_jobs (
+                request_id,
+                kind,
+                recipient_email,
+                subject,
+                body,
+                status,
+                send_after,
+                attempt_count,
+                last_error,
+                sent_at,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, ?)
+            """,
+            (
+                request_id,
+                kind,
+                recipient_email,
+                subject,
+                body,
+                status,
+                send_after,
+                created_at,
+            ),
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
+
+
+def update_request_paper_review(
+    database_path: Path,
+    *,
+    request_id: int,
+    next_paper_status: str,
+    pickup_info: str | None,
+    admin_note: str | None,
+    updated_at: str,
+) -> None:
+    with connect(database_path) as connection:
+        connection.execute(
+            """
+            UPDATE requests
+            SET paper_status = ?,
+                paper_pickup_info = ?,
+                paper_admin_note = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                next_paper_status,
+                pickup_info,
+                admin_note,
+                updated_at,
+                request_id,
+            ),
+        )
+        connection.commit()
+
+
+def create_admin_event(
+    database_path: Path,
+    *,
+    admin_user_id: int,
+    event_type: str,
+    entity_type: str,
+    entity_id: int,
+    metadata: dict[str, object],
+    created_at: str,
+) -> int:
+    with connect(database_path) as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO admin_events (
+                admin_user_id,
+                event_type,
+                entity_type,
+                entity_id,
+                metadata_json,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                admin_user_id,
+                event_type,
+                entity_type,
+                entity_id,
+                json.dumps(metadata, ensure_ascii=True),
+                created_at,
+            ),
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
+
+
+def list_admin_events(
+    database_path: Path,
+    *,
+    entity_type: str,
+    entity_id: int,
+) -> list[sqlite3.Row]:
+    with connect(database_path) as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM admin_events
+            WHERE entity_type = ? AND entity_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (entity_type, entity_id),
+        ).fetchall()

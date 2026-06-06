@@ -32,6 +32,8 @@ def init_database(database_path: Path) -> None:
                 consent INTEGER NOT NULL,
                 electronic_status TEXT NOT NULL,
                 paper_status TEXT NOT NULL,
+                paper_pickup_info TEXT,
+                paper_admin_note TEXT,
                 delivery_token_candidate TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -98,4 +100,12 @@ def init_database(database_path: Path) -> None:
             );
             """
         )
+        existing_request_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(requests)").fetchall()
+        }
+        if "paper_pickup_info" not in existing_request_columns:
+            connection.execute("ALTER TABLE requests ADD COLUMN paper_pickup_info TEXT")
+        if "paper_admin_note" not in existing_request_columns:
+            connection.execute("ALTER TABLE requests ADD COLUMN paper_admin_note TEXT")
         connection.commit()

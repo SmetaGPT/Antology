@@ -10,6 +10,7 @@ from app.repository import (
     get_email_job,
     get_download_token_state,
     get_request,
+    list_admin_events,
     list_email_jobs,
 )
 from app.worker_service import process_due_email_jobs
@@ -627,3 +628,210 @@ def test_admin_request_detail_shows_contact_data(tmp_path: Path) -> None:
     assert "Voronina" in detail_response.text
     assert "City Archive" in detail_response.text
     assert "daria@example.com" in detail_response.text
+
+
+def test_admin_can_approve_paper_request_and_create_pickup_email_job(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+
+    with client:
+        response = client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Petr",
+                "last_name": "Belov",
+                "email": "petr@example.com",
+                "purpose": "Need a printed copy for a district archive desk.",
+                "format": "paper",
+                "consent": True,
+            },
+        )
+        request_id = response.json()["request_id"]
+
+        login_admin(client)
+
+        decision_response = client.post(
+            f"/admin/requests/{request_id}/paper-decision",
+            data={
+                "decision": "approve",
+                "pickup_info": "Pickup point: Tverskaya 1, weekdays 11:00-18:00.",
+                "admin_note": "Bring an ID to confirm the reservation.",
+            },
+            follow_redirects=False,
+        )
+
+    assert decision_response.status_code == 303
+    assert decision_response.headers["location"] == f"/admin/requests/{request_id}"
+
+    request_row = get_request(database_path, request_id)
+    assert request_row is not None
+    assert request_row["paper_status"] == "approved"
+    assert request_row["paper_pickup_info"] == "Pickup point: Tverskaya 1, weekdays 11:00-18:00."
+    assert request_row["paper_admin_note"] == "Bring an ID to confirm the reservation."
+
+    email_jobs = list_email_jobs(database_path, request_id)
+    assert len(email_jobs) == 1
+    assert email_jobs[0]["kind"] == "paper_pickup"
+    assert email_jobs[0]["status"] == "pending"
+    assert "Pickup point: Tverskaya 1" in email_jobs[0]["body"]
+
+    admin_events = list_admin_events(
+        database_path,
+        entity_type="request",
+        entity_id=request_id,
+    )
+    assert len(admin_events) == 1
+    assert admin_events[0]["event_type"] == "paper_request_approved"
+    assert '"email_job_id"' in admin_events[0]["metadata_json"]
+
+
+def test_admin_can_reject_paper_request_and_create_rejection_email_job(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+
+    with client:
+        response = client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Svetlana",
+                "last_name": "Egorova",
+                "email": "svetlana@example.com",
+                "purpose": "Need a printed copy for a private collection request.",
+                "format": "both",
+                "consent": True,
+            },
+        )
+        request_id = response.json()["request_id"]
+
+        login_admin(client)
+
+        decision_response = client.post(
+            f"/admin/requests/{request_id}/paper-decision",
+            data={
+                "decision": "reject",
+                "pickup_info": "",
+                "admin_note": "Printed stock is temporarily unavailable.",
+            },
+            follow_redirects=False,
+        )
+
+    assert decision_response.status_code == 303
+
+    request_row = get_request(database_path, request_id)
+    assert request_row is not None
+    assert request_row["paper_status"] == "rejected"
+    assert request_row["paper_pickup_info"] is None
+    assert request_row["paper_admin_note"] == "Printed stock is temporarily unavailable."
+
+    email_jobs = list_email_jobs(database_path, request_id)
+    assert len(email_jobs) == 2
+    assert email_jobs[0]["kind"] == "electronic_link"
+    assert email_jobs[1]["kind"] == "paper_rejected"
+    assert "temporarily unavailable" in email_jobs[1]["body"]
+
+    admin_events = list_admin_events(
+        database_path,
+        entity_type="request",
+        entity_id=request_id,
+    )
+    assert len(admin_events) == 1
+    assert admin_events[0]["event_type"] == "paper_request_rejected"
+
+
+def test_admin_rejects_invalid_paper_transition(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+
+    with client:
+        response = client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Roman",
+                "last_name": "Kiselev",
+                "email": "roman@example.com",
+                "purpose": "Need only electronic access for a reading club.",
+                "format": "electronic",
+                "consent": True,
+            },
+        )
+        request_id = response.json()["request_id"]
+
+        login_admin(client)
+
+        decision_response = client.post(
+            f"/admin/requests/{request_id}/paper-decision",
+            data={
+                "decision": "approve",
+                "pickup_info": "Front desk",
+                "admin_note": "",
+            },
+        )
+
+    assert decision_response.status_code == 400
+    assert "Paper decision can be applied only to requests in review status" in decision_response.text
+
+    request_row = get_request(database_path, request_id)
+    assert request_row is not None
+    assert request_row["paper_status"] == "none"
+    assert list_email_jobs(database_path, request_id)[0]["kind"] == "electronic_link"
+    assert list_admin_events(
+        database_path,
+        entity_type="request",
+        entity_id=request_id,
+    ) == []
+
+
+def test_worker_sends_due_paper_pickup_jobs(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+    settings = make_settings(database_path)
+    sender = FakeEmailSender()
+
+    with client:
+        response = client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Maksim",
+                "last_name": "Novikov",
+                "email": "maksim@example.com",
+                "purpose": "Need a printed copy for a cultural center.",
+                "format": "paper",
+                "consent": True,
+            },
+        )
+        request_id = response.json()["request_id"]
+        login_admin(client)
+        client.post(
+            f"/admin/requests/{request_id}/paper-decision",
+            data={
+                "decision": "approve",
+                "pickup_info": "Pickup at reception after Tuesday.",
+                "admin_note": "",
+            },
+        )
+
+    from app.db import connect
+
+    paper_jobs = list_email_jobs(database_path, request_id)
+    paper_job_id = paper_jobs[0]["id"]
+
+    with connect(database_path) as connection:
+        connection.execute(
+            "UPDATE email_jobs SET send_after = ? WHERE id = ?",
+            ("2000-01-01T00:00:00+00:00", paper_job_id),
+        )
+        connection.commit()
+
+    result = process_due_email_jobs(
+        database_path,
+        settings,
+        email_sender=sender,
+    )
+
+    assert result.processed_count == 1
+    assert result.sent_count == 1
+    assert result.failed_count == 0
+    assert len(sender.sent_payloads) == 1
+    payload = sender.sent_payloads[0]
+    assert hasattr(payload, "body")
+    assert "Pickup at reception after Tuesday." in payload.body
+
+    email_job = get_email_job(database_path, paper_job_id)
+    assert email_job is not None
+    assert email_job["status"] == "sent"

@@ -39,8 +39,8 @@ Exit criteria:
   - tokenized download endpoint is live
   - delayed email worker is live
 - admin authentication and dashboard are live
-- Next backend work should support paper-review actions and book upload
-  management.
+- paper-review actions, audit events, and follow-up email jobs are live
+- Next backend work should support book upload and active-version management.
 
 Exit criteria:
 - A real endpoint exists.
