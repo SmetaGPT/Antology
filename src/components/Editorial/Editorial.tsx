@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
 import { useRef } from 'react';
 import { useThemeStyles } from '../../hooks/useThemeStyles';
-import { ImagePlaceholder } from '../ui/ImagePlaceholder';
 
 export function Editorial() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -97,13 +96,10 @@ export function Editorial() {
           >
             <div className={`editorial-frame ${isDark ? 'editorial-frame-dark' : 'editorial-frame-light'}`}>
               <div className="editorial-frame-inner">
-                <ImagePlaceholder
-                  src="/images/book-spread.jpg"
+                <img
+                  src="/razvorot.png"
                   alt="Книжный разворот Антологии"
-                  aspectRatio="square"
-                  className="rounded-none"
-                  overlayText="Книжный разворот"
-                  iconVariant="book"
+                  className={`h-full w-full object-contain ${isDark ? 'bg-graphite-950/65' : 'bg-white/70'}`}
                 />
               </div>
 

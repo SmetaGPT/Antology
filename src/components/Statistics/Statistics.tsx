@@ -6,7 +6,12 @@ const stats = [
   { number: '10', label: 'томов', suffix: '' },
   { number: '13', label: 'книг', suffix: '' },
   { number: '6200+', label: 'городов и сёл', suffix: '' },
-  { number: 'до 1914', label: 'года основания', suffix: '' },
+  {
+    number: '100+',
+    label: 'авторских\nисследований',
+    suffix: '',
+    labelClassName: 'whitespace-pre-line leading-tight max-w-[9rem] mx-auto',
+  },
   {
     number: 'Россия',
     label: 'от края до края',
