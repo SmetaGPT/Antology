@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { BookOpen } from 'lucide-react';
+import { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface ImagePlaceholderProps {
@@ -31,9 +32,9 @@ export function ImagePlaceholder({
 }: ImagePlaceholderProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const imageExists = false;
+  const [hasImageError, setHasImageError] = useState(false);
 
-  if (!imageExists || !src) {
+  if (!src || hasImageError) {
     return (
       <div
         className={`image-placeholder ${aspectRatios[aspectRatio]} ${className} relative overflow-hidden`}
@@ -61,8 +62,15 @@ export function ImagePlaceholder({
   }
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
-      <img src={src} alt={alt} className="w-full h-full object-cover" />
+    <div className={`${aspectRatios[aspectRatio]} relative overflow-hidden ${className}`}>
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        decoding="async"
+        onError={() => setHasImageError(true)}
+      />
       {overlay && (
         <div className="absolute inset-0 bg-graphite-950/40" />
       )}

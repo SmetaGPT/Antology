@@ -1,6 +1,6 @@
 <!-- generated: run npm run agent:sync -->
 <!-- source: .agent/state.json -->
-<!-- generatedAt: 2026-06-06T17:19:17.962Z -->
+<!-- generatedAt: 2026-06-07T08:23:36.349Z -->
 
 # Agent Startup
 
@@ -9,20 +9,20 @@
 - Default: `.agent/state.json` -> `.agent/snapshot.md`
 
 ## Now
-- [`REL-001`] Final content and legal approval (content)
+- [`REL-001`] Final content, legal, and launch-asset approval (content)
 - Owner: `agent`
 - Status: `blocked`
-- Next: Resolve final content, legal destinations, and approved media assets before release sign-off.
-- Areas: `content`, `release`
+- Next: Resolve final content, legal destinations, approved media assets, and finish the final accessibility/content pass before release sign-off.
+- Areas: `content`, `release`, `frontend`
 
 ## Next
-- none
+- [`QA-001`] Final accessibility and content QA pass after approved assets land (frontend)
 
 ## Later
 - none
 
 ## Blockers
-- [`BLK-002`] Production content and legal assets are incomplete (high) -> Provide final contacts, legal targets, and approved media assets.
+- [`BLK-002`] Production content and legal assets are incomplete (high) -> Provide final contacts, legal targets, approved media assets, and production-approved wording for the launch surface.
 
 ## Canonical
 - Now: `.agent/state.json`

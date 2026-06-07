@@ -4,7 +4,7 @@
     "name": "Antology.V2",
     "objective": "Ship a production-ready full-stack landing page with a real lead flow.",
     "phase": "release-blocked",
-    "lastUpdated": "2026-06-06",
+    "lastUpdated": "2026-06-07",
     "targets": [
       "frontend",
       "backend",
@@ -54,10 +54,11 @@
     "task": "REL-001",
     "owner": "agent",
     "status": "blocked",
-    "next": "Resolve final content, legal destinations, and approved media assets before release sign-off.",
+    "next": "Resolve final content, legal destinations, approved media assets, and finish the final accessibility/content pass before release sign-off.",
     "areas": [
       "content",
-      "release"
+      "release",
+      "frontend"
     ]
   },
   "tasks": {
@@ -65,10 +66,16 @@
       {
         "id": "REL-001",
         "track": "content",
-        "title": "Final content and legal approval"
+        "title": "Final content, legal, and launch-asset approval"
       }
     ],
-    "next": [],
+    "next": [
+      {
+        "id": "QA-001",
+        "track": "frontend",
+        "title": "Final accessibility and content QA pass after approved assets land"
+      }
+    ],
     "later": []
   },
   "blockers": [
@@ -76,7 +83,7 @@
       "id": "BLK-002",
       "sev": "high",
       "title": "Production content and legal assets are incomplete",
-      "next": "Provide final contacts, legal targets, and approved media assets.",
+      "next": "Provide final contacts, legal targets, approved media assets, and production-approved wording for the launch surface.",
       "ref": [
         ".agent/roadmap.md#content-and-legal-track",
         ".agent/release.md#release-gates"

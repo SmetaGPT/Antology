@@ -52,3 +52,19 @@ class RequestAccessResponse(BaseModel):
     paper_status: Literal["none", "review", "approved", "rejected"]
     email_job_id: int | None = None
     delivery_scheduled_for: str | None = None
+    confirmation_message: str
+    electronic_delivery_delay_minutes: int | None = None
+
+
+class SiteVisitPayload(BaseModel):
+    session_id: str = Field(min_length=8, max_length=120)
+    path: str = Field(min_length=1, max_length=500)
+    referrer: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("session_id", "path", "referrer")
+    @classmethod
+    def strip_visit_values(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        stripped = value.strip()
+        return stripped or None

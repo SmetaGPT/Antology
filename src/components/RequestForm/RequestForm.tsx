@@ -26,6 +26,13 @@ interface FormErrors {
   submit?: string;
 }
 
+interface RequestAccessApiResponse {
+  status: 'accepted';
+  request_id: number;
+  confirmation_message: string;
+  electronic_delivery_delay_minutes?: number | null;
+}
+
 const initialFormData: FormData = {
   firstName: '',
   lastName: '',
@@ -46,6 +53,7 @@ export function RequestForm() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState('');
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -118,6 +126,8 @@ export function RequestForm() {
         throw new Error(fallbackMessage);
       }
 
+      const responsePayload = (await response.json()) as RequestAccessApiResponse;
+      setConfirmationMessage(responsePayload.confirmation_message);
       setIsSubmitted(true);
     } catch (error) {
       const message =
@@ -172,11 +182,12 @@ export function RequestForm() {
               Заявка принята
             </h3>
             <p className={`text-lg mb-8 ${isDark ? 'text-ivory-300/80' : 'text-lightTextSecondary/80'}`}>
-              Заявка зафиксирована. Ссылка на электронную версию или решение по печатному комплекту будут отправлены по выбранному сценарию.
+              {confirmationMessage}
             </p>
               <button
                 onClick={() => {
                   setIsSubmitted(false);
+                  setConfirmationMessage('');
                   setFormData(initialFormData);
                   setErrors({});
                 }}
@@ -249,11 +260,14 @@ export function RequestForm() {
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
+                  required
+                  aria-invalid={errors.firstName ? 'true' : 'false'}
+                  aria-describedby={errors.firstName ? 'firstName-error' : undefined}
                   className={`input-field ${errors.firstName ? 'border-burgundy-500' : ''}`}
                   placeholder="Иван"
                 />
                 {errors.firstName && (
-                  <p className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
+                  <p id="firstName-error" className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
                     {errors.firstName}
                   </p>
@@ -269,11 +283,14 @@ export function RequestForm() {
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
+                  required
+                  aria-invalid={errors.lastName ? 'true' : 'false'}
+                  aria-describedby={errors.lastName ? 'lastName-error' : undefined}
                   className={`input-field ${errors.lastName ? 'border-burgundy-500' : ''}`}
                   placeholder="Иванов"
                 />
                 {errors.lastName && (
-                  <p className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
+                  <p id="lastName-error" className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
                     {errors.lastName}
                   </p>
@@ -323,11 +340,14 @@ export function RequestForm() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  required
+                  aria-invalid={errors.email ? 'true' : 'false'}
+                  aria-describedby={errors.email ? 'email-error' : undefined}
                   className={`input-field ${errors.email ? 'border-burgundy-500' : ''}`}
                   placeholder="email@example.com"
                 />
                 {errors.email && (
-                  <p className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
+                  <p id="email-error" className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
                     {errors.email}
                   </p>
@@ -359,13 +379,16 @@ export function RequestForm() {
                 value={formData.purpose}
                 onChange={handleChange}
                 rows={3}
+                required
+                aria-invalid={errors.purpose ? 'true' : 'false'}
+                aria-describedby={errors.purpose ? 'purpose-error' : undefined}
                 className={`input-field resize-none ${
                   errors.purpose ? 'border-burgundy-500' : ''
                 }`}
                 placeholder="Опишите, для каких целей вам нужна Антология..."
               />
               {errors.purpose && (
-                <p className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
+                <p id="purpose-error" className="mt-1 text-sm text-burgundy-400 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
                   {errors.purpose}
                 </p>
@@ -456,7 +479,7 @@ export function RequestForm() {
                 </span>
               </label>
               {errors.consent && (
-                <p className="mt-2 text-sm text-burgundy-400 flex items-center gap-1 ml-8">
+                <p id="consent-error" className="mt-2 text-sm text-burgundy-400 flex items-center gap-1 ml-8">
                   <AlertCircle className="w-4 h-4" />
                   {errors.consent}
                 </p>
@@ -466,7 +489,7 @@ export function RequestForm() {
             {/* Submit */}
             <div className="pt-4">
               {errors.submit && (
-                <p className="mb-4 text-sm text-burgundy-400 flex items-center gap-2">
+                <p role="alert" className="mb-4 text-sm text-burgundy-400 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
                   {errors.submit}
                 </p>

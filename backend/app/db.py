@@ -101,6 +101,22 @@ def init_database(database_path: Path) -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (admin_user_id) REFERENCES admin_users(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS site_visits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL UNIQUE,
+                path TEXT NOT NULL,
+                referrer TEXT,
+                request_ip TEXT,
+                user_agent TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS system_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
         existing_request_columns = {

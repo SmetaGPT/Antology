@@ -11,10 +11,10 @@ Detailed sprint roadmap:
 
 ## Current Phase
 
-- Phase: `lean-production-sprints`
-- Immediate objective: convert the prototype landing page into a production-ready
-  lean full-stack system for requests, delayed book-link delivery, paper-edition
-  review, and simple administration.
+- Phase: `release-blocked`
+- Immediate objective: close the remaining launch blockers on content, legal
+  destinations, approved assets, and final QA while keeping the validated lean
+  production stack ready to ship.
 
 ## Workstreams
 
@@ -26,7 +26,7 @@ Detailed sprint roadmap:
 
 Exit criteria:
 - Real content and legal destinations are present.
-- Image rendering works without forced placeholders.
+- Approved media assets and share previews are present.
 - SEO defaults and obvious accessibility issues are closed.
 
 ### Backend Track
@@ -34,7 +34,7 @@ Exit criteria:
 - `BACK-001`: implement the request-access backend path.
 - Runtime choice: Python `FastAPI` service.
 - Initial persistence choice: local `SQLite` for development bootstrap.
-- Current baseline:
+- Current status:
 - request intake and status workflow is live
 - tokenized download endpoint is live
 - delayed email worker is live
@@ -42,12 +42,13 @@ Exit criteria:
 - paper-review actions, audit events, and follow-up email jobs are live
 - book upload and active-version management are live
 - anti-spam, consent evidence, and local legal pages are live
-- Next work should support deployment, persistent runtime layout, and backups.
+- deployment/runtime layout, backups, and release validation are live
 
 Exit criteria:
 - A real endpoint exists.
 - Submissions are validated and stored.
 - The frontend reflects success and failure states.
+- Release validation stays green.
 
 ### Ops Track
 
@@ -60,6 +61,12 @@ Exit criteria:
 - Deployment target is explicit.
 - Environment contract is documented.
 - Release gates can be validated against a real target.
+
+Current status:
+- compose-based local production-like runtime is documented
+- reverse proxy contract is documented
+- persistent SQLite/book storage and backup flow are documented
+- one-command release validation is live
 
 ### Content and Legal Track
 
@@ -79,16 +86,10 @@ Exit criteria:
 - Effect: blocks release readiness even if engineering work lands
 - Next action: provide final legal links, contacts, and approved media
 
-### BLK-OPS
-
-- Title: Python backend deploy target is undefined
-- Effect: blocks final environment and release decisions
-- Next action: choose hosting/runtime and define the environment contract
-
 ## Near-Term Sequence
 
 1. Keep the harness as the canonical control layer.
 2. Remove production blockers in the frontend/content slice.
-3. Implement the Python form backend and its local persistence path.
-4. Lock the deployment contract for the Python API.
-5. Run release validation against the chosen target.
+3. Land approved media/share assets and final legal/contact destinations.
+4. Run the focused accessibility/content QA pass.
+5. Re-run release validation against the release candidate content set.

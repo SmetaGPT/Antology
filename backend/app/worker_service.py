@@ -70,7 +70,7 @@ def process_due_email_jobs(
                 )
                 download_link = _build_download_link(settings, token_result.token)
                 subject, body = _render_electronic_link_email(download_link)
-            elif job["kind"] in {"paper_pickup", "paper_rejected"}:
+            elif job["kind"] in {"request_confirmation", "paper_pickup", "paper_rejected"}:
                 subject = str(job["subject"])
                 body = str(job["body"])
             else:

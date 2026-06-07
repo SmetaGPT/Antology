@@ -34,6 +34,10 @@ class Settings:
     secret_key: str
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
 def _split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
@@ -46,7 +50,33 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", maxsplit=1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+def _load_default_env_files() -> None:
+    for candidate in (
+        REPO_ROOT / ".env",
+        BACKEND_ROOT / ".env",
+        REPO_ROOT / ".env.production",
+        BACKEND_ROOT / ".env.production",
+    ):
+        _load_env_file(candidate)
+
+
 def get_settings() -> Settings:
+    _load_default_env_files()
     app_env = os.getenv("APP_ENV", "development")
     database_path = Path(os.getenv("DATABASE_PATH", "backend/data/leads.db"))
     book_storage_dir = Path(os.getenv("BOOK_STORAGE_DIR", "backend/data/books"))

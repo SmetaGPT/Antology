@@ -173,6 +173,8 @@ def test_request_access_creates_electronic_request_and_email_job(tmp_path: Path)
     assert payload["paper_status"] == "none"
     assert payload["email_job_id"] is not None
     assert payload["delivery_scheduled_for"] is not None
+    assert "Письмо с подтверждением" in payload["confirmation_message"]
+    assert payload["electronic_delivery_delay_minutes"] == 30
 
     request_row = get_request(database_path, payload["request_id"])
     assert request_row is not None
@@ -185,9 +187,11 @@ def test_request_access_creates_electronic_request_and_email_job(tmp_path: Path)
     assert request_row["user_agent"]
 
     email_jobs = list_email_jobs(database_path, payload["request_id"])
-    assert len(email_jobs) == 1
-    assert email_jobs[0]["kind"] == "electronic_link"
+    assert len(email_jobs) == 2
+    assert email_jobs[0]["kind"] == "request_confirmation"
     assert email_jobs[0]["status"] == "pending"
+    assert email_jobs[1]["kind"] == "electronic_link"
+    assert email_jobs[1]["status"] == "pending"
 
 
 def test_request_access_creates_paper_review_without_email_job(tmp_path: Path) -> None:
@@ -215,11 +219,15 @@ def test_request_access_creates_paper_review_without_email_job(tmp_path: Path) -
     assert payload["paper_status"] == "review"
     assert payload["email_job_id"] is None
     assert payload["delivery_scheduled_for"] is None
+    assert "5 рабочих дней" in payload["confirmation_message"]
+    assert payload["electronic_delivery_delay_minutes"] is None
 
     request_row = get_request(database_path, payload["request_id"])
     assert request_row is not None
     assert request_row["delivery_token_candidate"] is None
-    assert list_email_jobs(database_path, payload["request_id"]) == []
+    email_jobs = list_email_jobs(database_path, payload["request_id"])
+    assert len(email_jobs) == 1
+    assert email_jobs[0]["kind"] == "request_confirmation"
 
 
 def test_request_access_creates_both_paths(tmp_path: Path) -> None:
@@ -246,14 +254,18 @@ def test_request_access_creates_both_paths(tmp_path: Path) -> None:
     assert payload["electronic_status"] == "pending"
     assert payload["paper_status"] == "review"
     assert payload["email_job_id"] is not None
+    assert "5 рабочих дней" in payload["confirmation_message"]
+    assert payload["electronic_delivery_delay_minutes"] == 30
 
     request_row = get_request(database_path, payload["request_id"])
     assert request_row is not None
     assert request_row["delivery_token_candidate"] is not None
 
     email_jobs = list_email_jobs(database_path, payload["request_id"])
-    assert len(email_jobs) == 1
+    assert len(email_jobs) == 2
+    assert email_jobs[0]["kind"] == "request_confirmation"
     assert email_jobs[0]["recipient_email"] == "elena@example.com"
+    assert email_jobs[1]["kind"] == "electronic_link"
 
 
 def test_request_access_silently_drops_honeypot_submission(tmp_path: Path) -> None:
@@ -340,6 +352,43 @@ def test_request_access_rate_limits_repeated_email_requests(tmp_path: Path) -> N
     assert first.status_code == 201
     assert second.status_code == 429
     assert second.json()["detail"] == "Too many requests. Please try again later."
+
+
+def test_site_visit_endpoint_tracks_single_session_once(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+
+    with client:
+        first = client.post(
+            "/api/site-visit",
+            json={
+                "session_id": "session-001",
+                "path": "/",
+                "referrer": "https://example.test",
+            },
+        )
+        second = client.post(
+            "/api/site-visit",
+            json={
+                "session_id": "session-001",
+                "path": "/",
+                "referrer": "https://example.test",
+            },
+        )
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+
+    with connect(database_path) as connection:
+        visits = connection.execute(
+            "SELECT session_id, path, referrer, request_ip, user_agent FROM site_visits"
+        ).fetchall()
+
+    assert len(visits) == 1
+    assert visits[0]["session_id"] == "session-001"
+    assert visits[0]["path"] == "/"
+    assert visits[0]["referrer"] == "https://example.test"
+    assert visits[0]["request_ip"]
+    assert visits[0]["user_agent"]
 
 
 def test_download_book_returns_active_book_for_valid_token(tmp_path: Path) -> None:
@@ -462,6 +511,10 @@ def test_worker_sends_due_electronic_jobs(tmp_path: Path) -> None:
 
     with connect(database_path) as connection:
         connection.execute(
+            "UPDATE email_jobs SET send_after = ? WHERE request_id = ? AND kind = 'request_confirmation'",
+            ("2999-01-01T00:00:00+00:00", request_id),
+        )
+        connection.execute(
             "UPDATE email_jobs SET send_after = ? WHERE id = ?",
             ("2000-01-01T00:00:00+00:00", email_job_id),
         )
@@ -513,7 +566,14 @@ def test_worker_ignores_future_jobs_until_due(tmp_path: Path) -> None:
             },
         )
 
+    request_id = response.json()["request_id"]
     email_job_id = response.json()["email_job_id"]
+    with connect(database_path) as connection:
+        connection.execute(
+            "UPDATE email_jobs SET send_after = ? WHERE request_id = ? AND kind = 'request_confirmation'",
+            ("2999-01-01T00:00:00+00:00", request_id),
+        )
+        connection.commit()
     result = process_due_email_jobs(
         database_path,
         settings,
@@ -581,6 +641,10 @@ def test_worker_keeps_failure_metadata_for_failed_jobs(tmp_path: Path) -> None:
 
     with connect(database_path) as connection:
         connection.execute(
+            "UPDATE email_jobs SET send_after = ? WHERE request_id = ? AND kind = 'request_confirmation'",
+            ("2999-01-01T00:00:00+00:00", request_id),
+        )
+        connection.execute(
             "UPDATE email_jobs SET send_after = ? WHERE id = ?",
             ("2000-01-01T00:00:00+00:00", email_job_id),
         )
@@ -609,7 +673,7 @@ def test_worker_keeps_failure_metadata_for_failed_jobs(tmp_path: Path) -> None:
 
 def login_admin(client: TestClient) -> None:
     response = client.post(
-        "/admin/login",
+        "/ad/log",
         data={
             "email": "admin@antology.test",
             "password": "test-password",
@@ -628,7 +692,7 @@ def test_admin_routes_require_authentication(tmp_path: Path) -> None:
         response = client.get("/admin", follow_redirects=False)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin/login"
+    assert response.headers["location"] == "/ad/log"
 
 
 def test_admin_can_log_in_and_log_out(tmp_path: Path) -> None:
@@ -639,17 +703,91 @@ def test_admin_can_log_in_and_log_out(tmp_path: Path) -> None:
 
         dashboard_response = client.get("/admin")
         assert dashboard_response.status_code == 200
-        assert "Antology Admin Dashboard" in dashboard_response.text
+        assert "Панель администратора" in dashboard_response.text
+        assert "Anthology" in dashboard_response.text
+        assert "Admin" in dashboard_response.text
 
         logout_response = client.post("/admin/logout", follow_redirects=False)
         assert logout_response.status_code == 303
-        assert logout_response.headers["location"] == "/admin/login"
+        assert logout_response.headers["location"] == "/ad/log"
+
+
+def test_admin_login_is_case_insensitive_for_seeded_email(tmp_path: Path) -> None:
+    database_path = tmp_path / "test.db"
+    settings = make_settings(database_path)
+    mixed_case_settings = SettingsModel(
+        app_name=settings.app_name,
+        app_env=settings.app_env,
+        api_prefix=settings.api_prefix,
+        cors_origins=settings.cors_origins,
+        public_base_url=settings.public_base_url,
+        database_path=settings.database_path,
+        book_storage_dir=settings.book_storage_dir,
+        expose_api_docs=settings.expose_api_docs,
+        download_token_ttl_hours=settings.download_token_ttl_hours,
+        max_book_upload_mb=settings.max_book_upload_mb,
+        delivery_delay_minutes=settings.delivery_delay_minutes,
+        rate_limit_window_minutes=settings.rate_limit_window_minutes,
+        rate_limit_max_per_ip=settings.rate_limit_max_per_ip,
+        rate_limit_max_per_email=settings.rate_limit_max_per_email,
+        smtp_host=settings.smtp_host,
+        smtp_port=settings.smtp_port,
+        smtp_username=settings.smtp_username,
+        smtp_password=settings.smtp_password,
+        smtp_from_email=settings.smtp_from_email,
+        smtp_use_tls=settings.smtp_use_tls,
+        email_max_retries=settings.email_max_retries,
+        worker_poll_interval_seconds=settings.worker_poll_interval_seconds,
+        admin_email="Nikita_G@yandex.ru",
+        admin_password="amin123$",
+        secret_key=settings.secret_key,
+    )
+    client = TestClient(create_app(mixed_case_settings))
+
+    with client:
+        response = client.post(
+            "/ad/log",
+            data={
+                "email": "nikita_g@yandex.ru",
+                "password": "amin123$",
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin"
+
+
+def test_legacy_admin_login_route_redirects_to_new_path(tmp_path: Path) -> None:
+    client, _ = make_client(tmp_path)
+
+    with client:
+        response = client.get("/admin/login", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/ad/log"
 
 
 def test_admin_dashboard_shows_counts_and_filterable_requests(tmp_path: Path) -> None:
     client, database_path = make_client(tmp_path)
 
     with client:
+        client.post(
+            "/api/site-visit",
+            json={
+                "session_id": "visit-0001",
+                "path": "/",
+                "referrer": None,
+            },
+        )
+        client.post(
+            "/api/site-visit",
+            json={
+                "session_id": "visit-0002",
+                "path": "/",
+                "referrer": None,
+            },
+        )
         first = client.post(
             "/api/request-access",
             json={
@@ -729,18 +867,80 @@ def test_admin_dashboard_shows_counts_and_filterable_requests(tmp_path: Path) ->
 
         dashboard_response = client.get("/admin")
         assert dashboard_response.status_code == 200
-        assert "Total requests</strong><br>5" in dashboard_response.text
-        assert "Electronic sent</strong><br>1" in dashboard_response.text
-        assert "Electronic failed</strong><br>1" in dashboard_response.text
-        assert "Paper review</strong><br>1" in dashboard_response.text
-        assert "Paper approved</strong><br>1" in dashboard_response.text
-        assert "Paper rejected</strong><br>1" in dashboard_response.text
+        assert "Всего заявок" in dashboard_response.text
+        assert ">5<" in dashboard_response.text
+        assert "Отправлено (эл.)" in dashboard_response.text
+        assert "Ошибки (эл.)" in dashboard_response.text
+        assert "На проверке" in dashboard_response.text
+        assert "Одобрено" in dashboard_response.text
+        assert "Отклонено" in dashboard_response.text
+        assert "Посещения" in dashboard_response.text
+        assert "Конверсия" in dashboard_response.text
+        assert "За день" in dashboard_response.text
+        assert "Последние заявки" in dashboard_response.text
+        assert "Открыть все заявки" in dashboard_response.text
 
-        filtered_response = client.get("/admin?paper_status=review")
+        filtered_response = client.get("/admin/requests?paper_status=review")
         assert filtered_response.status_code == 200
         assert "Review User" in filtered_response.text
         assert "Approved User" not in filtered_response.text
         assert "Rejected User" not in filtered_response.text
+        assert "Фильтрация и обработка поступивших заявок" in filtered_response.text
+
+
+def test_admin_can_open_books_requests_and_settings_pages(tmp_path: Path) -> None:
+    client, _ = make_client(tmp_path)
+
+    with client:
+        login_admin(client)
+
+        books_response = client.get("/admin/books")
+        requests_response = client.get("/admin/requests")
+        settings_response = client.get("/admin/settings")
+
+    assert books_response.status_code == 200
+    assert "Версии книги" in books_response.text
+    assert requests_response.status_code == 200
+    assert "Фильтрация и обработка поступивших заявок" in requests_response.text
+    assert settings_response.status_code == 200
+    assert "Настройки отправки" in settings_response.text
+
+
+def test_admin_can_update_delivery_delay_setting(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+
+    with client:
+        login_admin(client)
+        response = client.post(
+            "/admin/settings/delivery-delay",
+            data={"delivery_delay_minutes": "90"},
+        )
+        request_response = client.post(
+            "/api/request-access",
+            json={
+                "first_name": "Delay",
+                "last_name": "User",
+                "email": "delay@example.com",
+                "purpose": "Need digital access for delayed link verification.",
+                "format": "electronic",
+                "consent": True,
+            },
+        )
+
+    assert response.status_code == 200
+    assert "Новая задержка отправки ссылки сохранена." in response.text
+
+    with connect(database_path) as connection:
+        setting_row = connection.execute(
+            "SELECT setting_value FROM system_settings WHERE setting_key = ?",
+            ("electronic_delivery_delay_minutes",),
+        ).fetchone()
+
+    assert setting_row is not None
+    assert setting_row["setting_value"] == "90"
+    assert request_response.status_code == 201
+    assert request_response.json()["electronic_delivery_delay_minutes"] == 90
+    assert "через 90 мин." in request_response.json()["confirmation_message"]
 
 
 def test_admin_request_detail_shows_contact_data(tmp_path: Path) -> None:
@@ -812,10 +1012,11 @@ def test_admin_can_approve_paper_request_and_create_pickup_email_job(tmp_path: P
     assert request_row["paper_admin_note"] == "Bring an ID to confirm the reservation."
 
     email_jobs = list_email_jobs(database_path, request_id)
-    assert len(email_jobs) == 1
-    assert email_jobs[0]["kind"] == "paper_pickup"
-    assert email_jobs[0]["status"] == "pending"
-    assert "Pickup point: Tverskaya 1" in email_jobs[0]["body"]
+    assert len(email_jobs) == 2
+    assert email_jobs[0]["kind"] == "request_confirmation"
+    assert email_jobs[1]["kind"] == "paper_pickup"
+    assert email_jobs[1]["status"] == "pending"
+    assert "Pickup point: Tverskaya 1" in email_jobs[1]["body"]
 
     admin_events = list_admin_events(
         database_path,
@@ -865,10 +1066,11 @@ def test_admin_can_reject_paper_request_and_create_rejection_email_job(tmp_path:
     assert request_row["paper_admin_note"] == "Printed stock is temporarily unavailable."
 
     email_jobs = list_email_jobs(database_path, request_id)
-    assert len(email_jobs) == 2
-    assert email_jobs[0]["kind"] == "electronic_link"
-    assert email_jobs[1]["kind"] == "paper_rejected"
-    assert "temporarily unavailable" in email_jobs[1]["body"]
+    assert len(email_jobs) == 3
+    assert email_jobs[0]["kind"] == "request_confirmation"
+    assert email_jobs[1]["kind"] == "electronic_link"
+    assert email_jobs[2]["kind"] == "paper_rejected"
+    assert "temporarily unavailable" in email_jobs[2]["body"]
 
     admin_events = list_admin_events(
         database_path,
@@ -913,7 +1115,9 @@ def test_admin_rejects_invalid_paper_transition(tmp_path: Path) -> None:
     request_row = get_request(database_path, request_id)
     assert request_row is not None
     assert request_row["paper_status"] == "none"
-    assert list_email_jobs(database_path, request_id)[0]["kind"] == "electronic_link"
+    email_jobs = list_email_jobs(database_path, request_id)
+    assert email_jobs[0]["kind"] == "request_confirmation"
+    assert email_jobs[1]["kind"] == "electronic_link"
     assert list_admin_events(
         database_path,
         entity_type="request",
@@ -950,9 +1154,13 @@ def test_worker_sends_due_paper_pickup_jobs(tmp_path: Path) -> None:
         )
 
     paper_jobs = list_email_jobs(database_path, request_id)
-    paper_job_id = paper_jobs[0]["id"]
+    paper_job_id = next(int(job["id"]) for job in paper_jobs if job["kind"] == "paper_pickup")
 
     with connect(database_path) as connection:
+        connection.execute(
+            "UPDATE email_jobs SET send_after = ? WHERE request_id = ? AND kind = 'request_confirmation'",
+            ("2999-01-01T00:00:00+00:00", request_id),
+        )
         connection.execute(
             "UPDATE email_jobs SET send_after = ? WHERE id = ?",
             ("2000-01-01T00:00:00+00:00", paper_job_id),
@@ -998,7 +1206,7 @@ def test_admin_can_upload_new_pdf_and_make_it_active(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin"
+    assert response.headers["location"] == "/admin/books"
 
     versions = list_book_versions(database_path)
     assert len(versions) == 1
@@ -1049,7 +1257,7 @@ def test_admin_can_activate_existing_book_version(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin"
+    assert response.headers["location"] == "/admin/books"
 
     active_version = get_active_book_version(database_path)
     assert active_version is not None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -36,7 +37,7 @@ def create_request(
     delivery_token_candidate: str | None,
     created_at: str,
     updated_at: str,
-    email_job: dict[str, object] | None = None,
+    email_jobs: list[dict[str, object]] | None = None,
 ) -> RequestCreationResult:
     with connect(database_path) as connection:
         cursor = connection.execute(
@@ -90,7 +91,7 @@ def create_request(
         email_job_id: int | None = None
         send_after: str | None = None
 
-        if email_job is not None:
+        for email_job in email_jobs or []:
             job_cursor = connection.execute(
                 """
                 INSERT INTO email_jobs (
@@ -121,8 +122,9 @@ def create_request(
                     email_job["created_at"],
                 ),
             )
-            email_job_id = int(job_cursor.lastrowid)
-            send_after = str(email_job["send_after"])
+            if email_job.get("kind") == "electronic_link":
+                email_job_id = int(job_cursor.lastrowid)
+                send_after = str(email_job["send_after"])
 
         connection.commit()
 
@@ -345,6 +347,30 @@ def list_book_versions(database_path: Path) -> list[sqlite3.Row]:
         ).fetchall()
 
 
+def count_book_versions(database_path: Path) -> int:
+    with connect(database_path) as connection:
+        row = connection.execute("SELECT COUNT(*) AS count FROM book_versions").fetchone()
+    return int(row["count"] or 0)
+
+
+def list_book_versions_page(
+    database_path: Path,
+    *,
+    limit: int,
+    offset: int,
+) -> list[sqlite3.Row]:
+    with connect(database_path) as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM book_versions
+            ORDER BY uploaded_at DESC, id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
+
+
 def get_book_version(database_path: Path, book_version_id: int) -> sqlite3.Row | None:
     with connect(database_path) as connection:
         return connection.execute(
@@ -480,7 +506,7 @@ def upsert_admin_user(
 ) -> int:
     with connect(database_path) as connection:
         existing = connection.execute(
-            "SELECT id FROM admin_users WHERE email = ?",
+            "SELECT id FROM admin_users WHERE lower(email) = lower(?)",
             (email,),
         ).fetchone()
 
@@ -498,11 +524,12 @@ def upsert_admin_user(
         connection.execute(
             """
             UPDATE admin_users
-            SET password_hash = ?,
+            SET email = ?,
+                password_hash = ?,
                 is_active = ?
             WHERE id = ?
             """,
-            (password_hash, 1 if is_active else 0, existing["id"]),
+            (email, password_hash, 1 if is_active else 0, existing["id"]),
         )
         connection.commit()
         return int(existing["id"])
@@ -511,7 +538,7 @@ def upsert_admin_user(
 def get_admin_user_by_email(database_path: Path, email: str) -> sqlite3.Row | None:
     with connect(database_path) as connection:
         return connection.execute(
-            "SELECT * FROM admin_users WHERE email = ?",
+            "SELECT * FROM admin_users WHERE lower(email) = lower(?)",
             (email,),
         ).fetchone()
 
@@ -549,6 +576,125 @@ def get_admin_dashboard_counts(database_path: Path) -> dict[str, int]:
     }
 
 
+def get_request_activity_summary(database_path: Path) -> dict[str, object]:
+    now = datetime.now(timezone.utc)
+    day_prefix = now.strftime("%Y-%m-%d")
+    month_prefix = now.strftime("%Y-%m")
+    year_prefix = now.strftime("%Y")
+
+    with connect(database_path) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                SUM(CASE WHEN substr(created_at, 1, 10) = ? THEN 1 ELSE 0 END) AS day_requests,
+                SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS month_requests,
+                SUM(CASE WHEN substr(created_at, 1, 4) = ? THEN 1 ELSE 0 END) AS year_requests,
+                MAX(created_at) AS latest_request_at
+            FROM requests
+            """,
+            (day_prefix, month_prefix, year_prefix),
+        ).fetchone()
+
+    return {
+        "day_requests": int(row["day_requests"] or 0),
+        "month_requests": int(row["month_requests"] or 0),
+        "year_requests": int(row["year_requests"] or 0),
+        "latest_request_at": row["latest_request_at"],
+    }
+
+
+def create_site_visit(
+    database_path: Path,
+    *,
+    session_id: str,
+    path: str,
+    referrer: str | None,
+    request_ip: str | None,
+    user_agent: str | None,
+    created_at: str,
+) -> bool:
+    with connect(database_path) as connection:
+        cursor = connection.execute(
+            """
+            INSERT OR IGNORE INTO site_visits (
+                session_id,
+                path,
+                referrer,
+                request_ip,
+                user_agent,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session_id,
+                path,
+                referrer,
+                request_ip,
+                user_agent,
+                created_at,
+            ),
+        )
+        connection.commit()
+        return int(cursor.rowcount or 0) > 0
+
+
+def get_site_and_request_activity_summary(database_path: Path) -> dict[str, object]:
+    now = datetime.now(timezone.utc)
+    day_prefix = now.strftime("%Y-%m-%d")
+    month_prefix = now.strftime("%Y-%m")
+    year_prefix = now.strftime("%Y")
+
+    with connect(database_path) as connection:
+        visit_row = connection.execute(
+            """
+            SELECT
+                SUM(CASE WHEN substr(created_at, 1, 10) = ? THEN 1 ELSE 0 END) AS day_visits,
+                SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS month_visits,
+                SUM(CASE WHEN substr(created_at, 1, 4) = ? THEN 1 ELSE 0 END) AS year_visits,
+                MAX(created_at) AS latest_visit_at
+            FROM site_visits
+            """,
+            (day_prefix, month_prefix, year_prefix),
+        ).fetchone()
+        request_row = connection.execute(
+            """
+            SELECT
+                SUM(CASE WHEN substr(created_at, 1, 10) = ? THEN 1 ELSE 0 END) AS day_requests,
+                SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS month_requests,
+                SUM(CASE WHEN substr(created_at, 1, 4) = ? THEN 1 ELSE 0 END) AS year_requests,
+                MAX(created_at) AS latest_request_at
+            FROM requests
+            """,
+            (day_prefix, month_prefix, year_prefix),
+        ).fetchone()
+
+    def conversion(visits: int, requests: int) -> float:
+        if visits <= 0:
+            return 0.0
+        return round((requests / visits) * 100, 1)
+
+    day_visits = int(visit_row["day_visits"] or 0)
+    month_visits = int(visit_row["month_visits"] or 0)
+    year_visits = int(visit_row["year_visits"] or 0)
+    day_requests = int(request_row["day_requests"] or 0)
+    month_requests = int(request_row["month_requests"] or 0)
+    year_requests = int(request_row["year_requests"] or 0)
+
+    return {
+        "day_visits": day_visits,
+        "month_visits": month_visits,
+        "year_visits": year_visits,
+        "day_requests": day_requests,
+        "month_requests": month_requests,
+        "year_requests": year_requests,
+        "day_conversion": conversion(day_visits, day_requests),
+        "month_conversion": conversion(month_visits, month_requests),
+        "year_conversion": conversion(year_visits, year_requests),
+        "latest_visit_at": visit_row["latest_visit_at"],
+        "latest_request_at": request_row["latest_request_at"],
+    }
+
+
 def list_requests_for_admin(
     database_path: Path,
     *,
@@ -578,6 +724,103 @@ def list_requests_for_admin(
 
     with connect(database_path) as connection:
         return connection.execute(query, values).fetchall()
+
+
+def count_requests_for_admin(
+    database_path: Path,
+    *,
+    request_format: str | None = None,
+    electronic_status: str | None = None,
+    paper_status: str | None = None,
+) -> int:
+    filters: list[str] = []
+    values: list[object] = []
+
+    if request_format:
+        filters.append("format = ?")
+        values.append(request_format)
+
+    if electronic_status:
+        filters.append("electronic_status = ?")
+        values.append(electronic_status)
+
+    if paper_status:
+        filters.append("paper_status = ?")
+        values.append(paper_status)
+
+    query = "SELECT COUNT(*) AS count FROM requests"
+    if filters:
+        query += " WHERE " + " AND ".join(filters)
+
+    with connect(database_path) as connection:
+        row = connection.execute(query, values).fetchone()
+    return int(row["count"] or 0)
+
+
+def list_requests_for_admin_page(
+    database_path: Path,
+    *,
+    request_format: str | None = None,
+    electronic_status: str | None = None,
+    paper_status: str | None = None,
+    limit: int,
+    offset: int,
+) -> list[sqlite3.Row]:
+    filters: list[str] = []
+    values: list[object] = []
+
+    if request_format:
+        filters.append("format = ?")
+        values.append(request_format)
+
+    if electronic_status:
+        filters.append("electronic_status = ?")
+        values.append(electronic_status)
+
+    if paper_status:
+        filters.append("paper_status = ?")
+        values.append(paper_status)
+
+    query = "SELECT * FROM requests"
+    if filters:
+        query += " WHERE " + " AND ".join(filters)
+    query += " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
+    values.extend([limit, offset])
+
+    with connect(database_path) as connection:
+        return connection.execute(query, values).fetchall()
+
+
+def get_system_setting(database_path: Path, key: str) -> str | None:
+    with connect(database_path) as connection:
+        row = connection.execute(
+            "SELECT setting_value FROM system_settings WHERE setting_key = ?",
+            (key,),
+        ).fetchone()
+    if row is None:
+        return None
+    return str(row["setting_value"])
+
+
+def set_system_setting(
+    database_path: Path,
+    *,
+    key: str,
+    value: str,
+    updated_at: str,
+) -> None:
+    with connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO system_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(setting_key) DO UPDATE SET
+                setting_value = excluded.setting_value,
+                updated_at = excluded.updated_at
+            """,
+            (key, value, updated_at),
+        )
+        connection.commit()
 
 
 def create_email_job(
