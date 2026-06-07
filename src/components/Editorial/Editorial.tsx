@@ -17,6 +17,7 @@ export function Editorial() {
     >
       {/* Background texture */}
       <div className={`absolute inset-0 opacity-5 ${isDark ? 'bg-gradient-to-br from-gold-500/10 via-transparent to-transparent' : 'bg-gradient-to-br from-gold-400/5 via-transparent to-transparent'}`} />
+      <div className={`absolute inset-0 ${isDark ? 'editorial-texture-dark' : 'editorial-texture-light'}`} />
 
       <div className="section-container relative">
         <motion.div
@@ -73,7 +74,7 @@ export function Editorial() {
               className={`text-base sm:text-lg leading-relaxed ${isDark ? 'text-ivory-200/82' : 'text-lightTextSecondary/90'}`}
             >
               Это уникальное издание представляет собой историко-градостроительный атлас,
-              охватывающий территорию современной России и documenting более шести тысяч
+              охватывающий территорию современной России и документирующий более шести тысяч
               исторических населённых пунктов, каждый из которых имеет свою уникальную
               историю, архитектурное наследие и градостроительную традицию.
             </motion.p>
@@ -102,6 +103,7 @@ export function Editorial() {
                   aspectRatio="square"
                   className="rounded-none"
                   overlayText="Книжный разворот"
+                  iconVariant="book"
                 />
               </div>
 

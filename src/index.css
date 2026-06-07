@@ -216,6 +216,34 @@
     border-color: rgba(217, 170, 91, 0.42);
     background: rgba(9, 12, 18, 0.55);
   }
+
+  .editorial-texture-dark {
+    background:
+      radial-gradient(80% 70% at 12% 20%, rgba(217, 170, 91, 0.08) 0%, transparent 65%),
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.016) 0px,
+        rgba(255, 255, 255, 0.016) 2px,
+        transparent 2px,
+        transparent 9px
+      );
+    opacity: 0.38;
+    pointer-events: none;
+  }
+
+  .editorial-texture-light {
+    background:
+      radial-gradient(80% 70% at 12% 20%, rgba(167, 119, 57, 0.08) 0%, transparent 65%),
+      repeating-linear-gradient(
+        90deg,
+        rgba(132, 95, 46, 0.022) 0px,
+        rgba(132, 95, 46, 0.022) 2px,
+        transparent 2px,
+        transparent 9px
+      );
+    opacity: 0.34;
+    pointer-events: none;
+  }
 }
 
 @layer utilities {

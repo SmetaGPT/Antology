@@ -7,7 +7,13 @@ const stats = [
   { number: '13', label: 'книг', suffix: '' },
   { number: '6200+', label: 'городов и сёл', suffix: '' },
   { number: 'до 1914', label: 'года основания', suffix: '' },
-  { number: 'вся', label: 'Россия', suffix: '' },
+  {
+    number: 'Россия',
+    label: 'от края до края',
+    suffix: '',
+    numberClassName: 'text-4xl md:text-5xl lg:text-6xl whitespace-nowrap',
+    labelClassName: 'max-w-[11rem] mx-auto leading-tight',
+  },
 ];
 
 export function Statistics() {
@@ -53,11 +59,11 @@ export function Statistics() {
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={isInView ? { opacity: 1, scale: 1 } : {}}
                 transition={{ duration: 0.6, delay: index * 0.1 + 0.2 }}
-                className={`stat-number block mb-2 transition-colors ${isDark ? 'group-hover:text-gold-300' : 'group-hover:text-gold-800'}`}
+                className={`stat-number block mb-2 transition-colors ${stat.numberClassName ?? ''} ${isDark ? 'group-hover:text-gold-300' : 'group-hover:text-gold-800'}`}
               >
                 {stat.number}
               </motion.span>
-              <span className={`text-sm tracking-wide uppercase ${isDark ? 'text-ivory-400/80' : 'text-lightTextSecondary'}`}>
+              <span className={`block text-sm tracking-wide uppercase ${stat.labelClassName ?? ''} ${isDark ? 'text-ivory-400/80' : 'text-lightTextSecondary'}`}>
                 {stat.label}
               </span>
             </motion.div>

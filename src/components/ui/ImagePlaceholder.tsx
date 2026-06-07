@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { BookOpen } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface ImagePlaceholderProps {
@@ -8,6 +9,7 @@ interface ImagePlaceholderProps {
   aspectRatio?: 'video' | 'square' | 'portrait' | 'wide' | 'auto';
   overlay?: boolean;
   overlayText?: string;
+  iconVariant?: 'default' | 'book';
 }
 
 const aspectRatios = {
@@ -25,6 +27,7 @@ export function ImagePlaceholder({
   aspectRatio = 'video',
   overlay = false,
   overlayText,
+  iconVariant = 'default',
 }: ImagePlaceholderProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -42,7 +45,11 @@ export function ImagePlaceholder({
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             className={`w-16 h-16 border rounded-sm flex items-center justify-center mb-3 ${isDark ? 'border-gold-500/30' : 'border-gold-600/30'}`}
           >
-            <div className={`w-8 h-8 border rounded-full ${isDark ? 'border-gold-400/40' : 'border-gold-600/40'}`} />
+            {iconVariant === 'book' ? (
+              <BookOpen className={`w-8 h-8 ${isDark ? 'text-gold-400/60' : 'text-gold-700/60'}`} />
+            ) : (
+              <div className={`w-8 h-8 border rounded-full ${isDark ? 'border-gold-400/40' : 'border-gold-600/40'}`} />
+            )}
           </motion.div>
           <p className={`text-sm font-light tracking-wide ${isDark ? 'text-ivory-400/60' : 'text-lightTextSecondary/70'}`}>
             {overlayText || alt}
