@@ -10,14 +10,17 @@ from fastapi import HTTPException, Request, status
 
 from .book_admin_service import build_book_versions_context
 from .config import Settings
+from .email_service import get_mail_settings_debug_snapshot
 from .repository import (
     count_book_versions,
+    count_inbound_emails,
     count_requests_for_admin,
     get_admin_dashboard_counts,
     get_admin_user_by_email,
     get_admin_user_by_id,
     get_site_and_request_activity_summary,
     get_system_setting,
+    list_inbound_emails_page,
     list_book_versions_page,
     list_requests_for_admin_page,
     upsert_admin_user,
@@ -244,5 +247,12 @@ def build_settings_page_context(
         "public_base_url": settings.public_base_url,
         "smtp_from_email": settings.smtp_from_email,
         "admin_email": settings.admin_email,
+        "mail_settings": get_mail_settings_debug_snapshot(database_path, settings),
+        "inbound_email_count": count_inbound_emails(database_path),
+        "inbound_emails": list_inbound_emails_page(
+            database_path,
+            limit=10,
+            offset=0,
+        ),
     }
     return context

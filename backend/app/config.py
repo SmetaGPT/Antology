@@ -32,6 +32,16 @@ class Settings:
     admin_email: str
     admin_password: str
     secret_key: str
+    smtp_security: str = "none"
+    mail_provider_key: str = "custom"
+    imap_host: str = ""
+    imap_port: int = 993
+    imap_username: str = ""
+    imap_password: str = ""
+    imap_security: str = "ssl"
+    imap_mailbox: str = "INBOX"
+    inbound_mail_enabled: bool = False
+    outbound_mail_enabled: bool = True
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -107,4 +117,17 @@ def get_settings() -> Settings:
         admin_email=os.getenv("ADMIN_EMAIL", "admin@example.com"),
         admin_password=os.getenv("ADMIN_PASSWORD", "change-me"),
         secret_key=os.getenv("SECRET_KEY", "dev-secret-key"),
+        smtp_security=os.getenv(
+            "SMTP_SECURITY",
+            "starttls" if _env_flag("SMTP_USE_TLS", False) else "none",
+        ).strip().lower(),
+        mail_provider_key=os.getenv("MAIL_PROVIDER_KEY", "custom").strip().lower(),
+        imap_host=os.getenv("IMAP_HOST", "").strip(),
+        imap_port=int(os.getenv("IMAP_PORT", "993")),
+        imap_username=os.getenv("IMAP_USERNAME", "").strip(),
+        imap_password=os.getenv("IMAP_PASSWORD", ""),
+        imap_security=os.getenv("IMAP_SECURITY", "ssl").strip().lower(),
+        imap_mailbox=os.getenv("IMAP_MAILBOX", "INBOX").strip() or "INBOX",
+        inbound_mail_enabled=_env_flag("INBOUND_MAIL_ENABLED", False),
+        outbound_mail_enabled=_env_flag("OUTBOUND_MAIL_ENABLED", True),
     )

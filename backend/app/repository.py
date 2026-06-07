@@ -823,6 +823,77 @@ def set_system_setting(
         connection.commit()
 
 
+def create_inbound_email(
+    database_path: Path,
+    *,
+    provider_key: str,
+    mailbox_name: str,
+    message_uid: str,
+    message_id: str | None,
+    from_email: str | None,
+    from_name: str | None,
+    subject: str,
+    body_text: str,
+    received_at: str | None,
+    imported_at: str,
+) -> bool:
+    with connect(database_path) as connection:
+        cursor = connection.execute(
+            """
+            INSERT OR IGNORE INTO inbound_emails (
+                provider_key,
+                mailbox_name,
+                message_uid,
+                message_id,
+                from_email,
+                from_name,
+                subject,
+                body_text,
+                received_at,
+                imported_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                provider_key,
+                mailbox_name,
+                message_uid,
+                message_id,
+                from_email,
+                from_name,
+                subject,
+                body_text,
+                received_at,
+                imported_at,
+            ),
+        )
+        connection.commit()
+        return int(cursor.rowcount or 0) > 0
+
+
+def count_inbound_emails(database_path: Path) -> int:
+    with connect(database_path) as connection:
+        row = connection.execute("SELECT COUNT(*) AS count FROM inbound_emails").fetchone()
+    return int(row["count"] or 0)
+
+
+def list_inbound_emails_page(
+    database_path: Path,
+    *,
+    limit: int,
+    offset: int,
+) -> list[sqlite3.Row]:
+    with connect(database_path) as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM inbound_emails
+            ORDER BY imported_at DESC, id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
+
+
 def create_email_job(
     database_path: Path,
     *,

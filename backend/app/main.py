@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -31,6 +32,7 @@ from .book_admin_service import store_uploaded_book, switch_active_book_version
 from .config import Settings, get_settings
 from .db import init_database
 from .download_service import resolve_download
+from .email_service import persist_mail_settings
 from .logging_utils import configure_logging
 from .paper_review_service import apply_paper_decision
 from .repository import create_admin_event, create_site_visit, get_request, list_admin_events, set_system_setting
@@ -40,6 +42,7 @@ from .request_access_service import (
     create_request_access,
 )
 from .schemas import RequestAccessPayload, RequestAccessResponse, SiteVisitPayload
+from .worker_service import process_due_email_jobs, sync_incoming_emails
 
 
 def _format_file_size(size_bytes: object) -> str:
@@ -640,6 +643,72 @@ def _render_admin_styles() -> str:
             flex-wrap: wrap;
           }
 
+                    .mail-settings-form {
+                        display: grid;
+                        gap: 12px;
+                    }
+
+                    .mail-provider-grid {
+                        display: grid;
+                        grid-template-columns: 1.05fr 1fr;
+                        gap: 10px;
+                    }
+
+                    .mail-protocol-title {
+                        color: var(--muted);
+                        font-size: 12px;
+                        font-weight: 800;
+                        letter-spacing: 0.06em;
+                        text-transform: uppercase;
+                    }
+
+                    .mail-grid-3,
+                    .mail-grid-2 {
+                        display: grid;
+                        gap: 10px;
+                    }
+
+                    .mail-grid-3 {
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                    }
+
+                    .mail-grid-2 {
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                    }
+
+                    .mail-divider {
+                        height: 1px;
+                        background: var(--line);
+                    }
+
+                    .mail-footer-grid {
+                        display: grid;
+                        grid-template-columns: 1.05fr 1fr;
+                        gap: 10px;
+                        align-items: start;
+                    }
+
+                    .mail-check-actions {
+                        display: grid;
+                        gap: 10px;
+                    }
+
+                    .mail-checkboxes {
+                        display: grid;
+                        gap: 8px;
+                    }
+
+                    .mail-actions {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        flex-wrap: wrap;
+                    }
+
+                    .mail-note {
+                        margin: 0;
+                    }
+
           .meta-note {
             color: var(--muted);
             font-size: 12px;
@@ -700,6 +769,7 @@ def _render_admin_styles() -> str:
             .split-grid { grid-template-columns: 1fr; }
             .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .upload-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                        .mail-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           }
 
           @media (max-width: 920px) {
@@ -720,6 +790,12 @@ def _render_admin_styles() -> str:
             .filter-grid {
               grid-template-columns: 1fr;
             }
+                        .mail-provider-grid,
+                        .mail-grid-2,
+                        .mail-grid-3,
+                        .mail-footer-grid {
+                            grid-template-columns: 1fr;
+                        }
             .upload-grid,
             .activity-compare-head,
             .activity-compare-row {
@@ -1209,11 +1285,43 @@ def _render_settings_page(
 ) -> str:
     delivery_delay_minutes = int(context["delivery_delay_minutes"])
     default_delivery_delay_minutes = int(context["default_delivery_delay_minutes"])
+    mail_settings = cast(dict[str, object], context["mail_settings"])
+    inbound_emails = cast(list[Row], context["inbound_emails"])
+    inbound_email_count = int(context["inbound_email_count"])
     notices = []
     if success_message:
         notices.append(f"<div class='notice'>{escape(success_message)}</div>")
     if error_message:
         notices.append(f"<div class='notice error'>{escape(error_message)}</div>")
+
+    provider_options_html = "".join(
+        (
+            f"<option value='{escape(key)}'"
+            f"{' selected' if str(mail_settings['provider_key']) == key else ''}>"
+            f"{escape(label)}</option>"
+        )
+        for key, label in (
+            ("custom", "Custom"),
+            ("local", "Local / Mailpit"),
+            ("gmail", "Gmail"),
+            ("yandex", "Yandex"),
+            ("mailru", "Mail.ru"),
+        )
+    )
+    inbound_rows_html = "".join(
+        (
+            "<tr>"
+            f"<td>{escape(str(row['imported_at'] or '—'))}</td>"
+            f"<td>{escape(str(row['from_email'] or '—'))}</td>"
+            f"<td>{escape(str(row['subject'] or 'Без темы'))}</td>"
+            f"<td>{escape(str(row['mailbox_name'] or 'INBOX'))}</td>"
+            "</tr>"
+        )
+        for row in inbound_emails
+    )
+    if not inbound_rows_html:
+        inbound_rows_html = f"<tr><td colspan='4'>{_render_empty_state('activity', 'Входящие письма ещё не импортированы')}</td></tr>"
+
     content_html = (
         "".join(notices)
         + "<section class='panel' style='margin-bottom:18px;'>"
@@ -1238,6 +1346,94 @@ def _render_settings_page(
         "<span class='meta-note'>Новое значение применяется ко всем новым электронным и смешанным заявкам.</span>"
         "</div>"
         "</form></section>"
+        "<section class='panel' style='margin-bottom:18px;'>"
+        "<div class='panel-header'>"
+        f"{_render_sidebar_icon('activity')}"
+        "<h2 class='panel-title'>Почтовый провайдер и автоматизация</h2>"
+        "</div>"
+        "<form method='post' action='/admin/settings/mail' class='mail-settings-form'>"
+        "<div class='mail-provider-grid'>"
+        "<div><label class='field-label'>Провайдер</label>"
+        f"<select class='select-input' name='provider_key'>{provider_options_html}</select>"
+        "<div class='meta-note' style='margin-top:6px;'>"
+        "Для Gmail, Yandex и Mail.ru SMTP/IMAP host/port/security будут взяты из preset. Для нестандартной конфигурации выбери Custom."
+        "</div></div>"
+        "<div><label class='field-label'>От кого отправлять</label>"
+        f"<input class='text-input' name='smtp_from_email' value='{escape(str(mail_settings['smtp_from_email']))}' placeholder='noreply@example.com'>"
+        "</div></div>"
+        "<div class='mail-protocol-title'>SMTP</div>"
+        "<div class='mail-grid-3'>"
+        "<div><label class='field-label'>Логин</label>"
+        f"<input class='text-input' name='smtp_username' value='{escape(str(mail_settings['smtp_username']))}'></div>"
+        "<div><label class='field-label'>Пароль</label>"
+        "<input class='text-input' type='password' name='smtp_password' placeholder='Оставь пустым, чтобы не менять'></div>"
+        "<div><label class='field-label'>Хост</label>"
+        f"<input class='text-input' name='smtp_host' value='{escape(str(mail_settings['smtp_host']))}'></div>"
+        "</div>"
+        "<div class='mail-grid-2'>"
+        "<div><label class='field-label'>Порт</label>"
+        f"<input class='text-input' type='number' name='smtp_port' value='{escape(str(mail_settings['smtp_port']))}'></div>"
+        "<div><label class='field-label'>Безопасность</label>"
+        "<select class='select-input' name='smtp_security'>"
+        f"<option value='none'{' selected' if str(mail_settings['smtp_security']) == 'none' else ''}>none</option>"
+        f"<option value='starttls'{' selected' if str(mail_settings['smtp_security']) == 'starttls' else ''}>starttls</option>"
+        f"<option value='ssl'{' selected' if str(mail_settings['smtp_security']) == 'ssl' else ''}>ssl</option>"
+        "</select></div>"
+        "</div>"
+        "<div class='mail-divider'></div>"
+        "<div class='mail-protocol-title'>IMAP</div>"
+        "<div class='mail-grid-3'>"
+        "<div><label class='field-label'>Логин</label>"
+        f"<input class='text-input' name='imap_username' value='{escape(str(mail_settings['imap_username']))}' placeholder='Не задан'></div>"
+        "<div><label class='field-label'>Пароль</label>"
+        "<input class='text-input' type='password' name='imap_password' placeholder='Оставь пустым, чтобы не менять'></div>"
+        "<div><label class='field-label'>Хост</label>"
+        f"<input class='text-input' name='imap_host' value='{escape(str(mail_settings['imap_host']))}'></div>"
+        "</div>"
+        "<div class='mail-grid-2'>"
+        "<div><label class='field-label'>Порт</label>"
+        f"<input class='text-input' type='number' name='imap_port' value='{escape(str(mail_settings['imap_port']))}'></div>"
+        "<div><label class='field-label'>Безопасность</label>"
+        "<select class='select-input' name='imap_security'>"
+        f"<option value='none'{' selected' if str(mail_settings['imap_security']) == 'none' else ''}>none</option>"
+        f"<option value='ssl'{' selected' if str(mail_settings['imap_security']) == 'ssl' else ''}>ssl</option>"
+        f"<option value='starttls'{' selected' if str(mail_settings['imap_security']) == 'starttls' else ''}>starttls</option>"
+        "</select></div>"
+        "</div>"
+        "<div class='mail-grid-2'>"
+        "<div><label class='field-label'>Входящая папка</label>"
+        f"<input class='text-input' name='imap_mailbox' value='{escape(str(mail_settings['imap_mailbox']))}'></div>"
+        "<div></div>"
+        "</div>"
+        "<div class='mail-footer-grid'>"
+        "<div class='mail-check-actions'>"
+        "<div class='mail-checkboxes'>"
+        f"<label class='checkbox-row compact'><input type='checkbox' name='outbound_mail_enabled' {'checked' if bool(mail_settings['outbound_mail_enabled']) else ''}> Автоотправка исходящих</label>"
+        f"<label class='checkbox-row compact'><input type='checkbox' name='inbound_mail_enabled' {'checked' if bool(mail_settings['inbound_mail_enabled']) else ''}> Автоприём входящих</label>"
+        "</div>"
+        "<div class='mail-actions'>"
+        "<button type='submit' class='primary-button'>Сохранить настройки</button>"
+        "<button type='submit' class='secondary-button' formaction='/admin/settings/mail/sync' formmethod='post'>Проверить почту</button>"
+        "</div>"
+        "</div>"
+        "<div class='summary-card'>"
+        "<strong>Автоматическая обработка</strong>"
+        "<p class='mail-note'>Очередь исходящих и импорт входящих обрабатываются фоновым циклом каждые несколько секунд.</p>"
+        "</div>"
+        "</div>"
+        "</form>"
+        "</section>"
+        "<section class='panel' style='margin-bottom:18px;'>"
+        "<div class='panel-header'>"
+        f"{_render_sidebar_icon('requests')}"
+        f"<h2 class='panel-title'>Последние входящие письма ({inbound_email_count})</h2>"
+        "</div>"
+        "<div class='table-wrap'><table><thead><tr>"
+        "<th>Импорт</th><th>Отправитель</th><th>Тема</th><th>Папка</th>"
+        "</tr></thead><tbody>"
+        f"{inbound_rows_html}"
+        "</tbody></table></div>"
+        "</section>"
         "<section class='panel'>"
         "<div class='panel-header'>"
         f"{_render_sidebar_icon('panel')}"
@@ -1380,11 +1576,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging(app_settings.app_env)
     logger = logging.getLogger("antology.api")
 
+    async def run_mail_cycle() -> None:
+        try:
+            send_result = process_due_email_jobs(
+                app_settings.database_path,
+                app_settings,
+            )
+            sync_result = sync_incoming_emails(
+                app_settings.database_path,
+                app_settings,
+            )
+            logger.info(
+                "mail_cycle_complete",
+                extra={
+                    "event": "mail_cycle_complete",
+                    "outbox_processed": send_result.processed_count,
+                    "outbox_sent": send_result.sent_count,
+                    "outbox_failed": send_result.failed_count,
+                    "inbox_processed": sync_result.processed_count,
+                    "inbox_imported": sync_result.imported_count,
+                    "inbox_duplicates": sync_result.duplicate_count,
+                },
+            )
+        except Exception:
+            logger.exception("mail_cycle_failed", extra={"event": "mail_cycle_failed"})
+
+    async def mail_worker_loop(stop_event: asyncio.Event) -> None:
+        while not stop_event.is_set():
+            await run_mail_cycle()
+            try:
+                await asyncio.wait_for(
+                    stop_event.wait(),
+                    timeout=app_settings.worker_poll_interval_seconds,
+                )
+            except asyncio.TimeoutError:
+                continue
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app_settings.book_storage_dir.mkdir(parents=True, exist_ok=True)
         init_database(app_settings.database_path)
         seed_admin_user(app_settings.database_path, app_settings)
+        stop_event = asyncio.Event()
+        worker_task: asyncio.Task[None] | None = None
+        if app_settings.app_env != "test":
+            worker_task = asyncio.create_task(mail_worker_loop(stop_event))
         logger.info(
             "app_started",
             extra={
@@ -1395,7 +1631,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "api_docs_enabled": app_settings.expose_api_docs,
             },
         )
-        yield
+        try:
+            yield
+        finally:
+            if worker_task is not None:
+                stop_event.set()
+                await worker_task
 
     app = FastAPI(
         title=app_settings.app_name,
@@ -1710,6 +1951,96 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 success_message="Новая задержка отправки ссылки сохранена.",
             )
         )
+
+    @app.post("/admin/settings/mail")
+    async def admin_update_mail_settings(request: Request):
+        admin_user = require_admin_user(request, app_settings.database_path, app_settings)
+        form_data = parse_qs((await request.body()).decode("utf-8"))
+        payload = {
+            key: str(values[0])
+            for key, values in form_data.items()
+            if values
+        }
+        updated_at = datetime.now(timezone.utc).isoformat()
+        try:
+            next_settings = persist_mail_settings(
+                app_settings.database_path,
+                app_settings,
+                payload,
+                updated_at=updated_at,
+            )
+        except ValueError as error:
+            context = build_settings_page_context(app_settings.database_path, app_settings)
+            return HTMLResponse(
+                _render_settings_page(
+                    str(admin_user["email"]),
+                    context,
+                    error_message=str(error),
+                ),
+                status_code=400,
+            )
+
+        create_admin_event(
+            app_settings.database_path,
+            admin_user_id=int(admin_user["id"]),
+            event_type="mail_settings_updated",
+            entity_type="system",
+            entity_id=1,
+            metadata={
+                "provider_key": next_settings.provider_key,
+                "smtp_host": next_settings.smtp_host,
+                "smtp_port": next_settings.smtp_port,
+                "imap_host": next_settings.imap_host,
+                "imap_port": next_settings.imap_port,
+                "outbound_mail_enabled": next_settings.outbound_mail_enabled,
+                "inbound_mail_enabled": next_settings.inbound_mail_enabled,
+            },
+            created_at=updated_at,
+        )
+        context = build_settings_page_context(app_settings.database_path, app_settings)
+        return HTMLResponse(
+            _render_settings_page(
+                str(admin_user["email"]),
+                context,
+                success_message="Почтовые настройки сохранены.",
+            )
+        )
+
+    @app.post("/admin/settings/mail/sync")
+    async def admin_sync_mail_now(request: Request):
+        admin_user = require_admin_user(request, app_settings.database_path, app_settings)
+        try:
+            send_result = process_due_email_jobs(
+                app_settings.database_path,
+                app_settings,
+            )
+            sync_result = sync_incoming_emails(
+                app_settings.database_path,
+                app_settings,
+            )
+            success_message = (
+                "Почтовый цикл выполнен: "
+                f"исходящих отправлено {send_result.sent_count}, "
+                f"входящих импортировано {sync_result.imported_count}."
+            )
+            context = build_settings_page_context(app_settings.database_path, app_settings)
+            return HTMLResponse(
+                _render_settings_page(
+                    str(admin_user["email"]),
+                    context,
+                    success_message=success_message,
+                )
+            )
+        except Exception as error:
+            context = build_settings_page_context(app_settings.database_path, app_settings)
+            return HTMLResponse(
+                _render_settings_page(
+                    str(admin_user["email"]),
+                    context,
+                    error_message=f"Не удалось выполнить почтовый цикл: {error}",
+                ),
+                status_code=500,
+            )
 
     @app.get("/admin/requests/{request_id}", response_class=HTMLResponse)
     async def admin_request_detail(request: Request, request_id: int) -> HTMLResponse:

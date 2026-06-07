@@ -117,6 +117,21 @@ def init_database(database_path: Path) -> None:
                 setting_value TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS inbound_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider_key TEXT NOT NULL,
+                mailbox_name TEXT NOT NULL,
+                message_uid TEXT NOT NULL,
+                message_id TEXT,
+                from_email TEXT,
+                from_name TEXT,
+                subject TEXT NOT NULL,
+                body_text TEXT,
+                received_at TEXT,
+                imported_at TEXT NOT NULL,
+                UNIQUE(mailbox_name, message_uid)
+            );
             """
         )
         existing_request_columns = {

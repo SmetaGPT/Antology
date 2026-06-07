@@ -25,7 +25,10 @@ get_request = cast(Any, repository.get_request)
 list_admin_events = cast(Any, repository.list_admin_events)
 list_book_versions = cast(Any, repository.list_book_versions)
 list_email_jobs = cast(Any, repository.list_email_jobs)
+set_system_setting = cast(Any, repository.set_system_setting)
 process_due_email_jobs = cast(Any, importlib.import_module("app.worker_service").process_due_email_jobs)
+sync_incoming_emails = cast(Any, importlib.import_module("app.worker_service").sync_incoming_emails)
+ReceivedEmail = cast(Any, importlib.import_module("app.email_service").ReceivedEmail)
 connect = cast(Any, importlib.import_module("app.db").connect)
 
 
@@ -941,6 +944,110 @@ def test_admin_can_update_delivery_delay_setting(tmp_path: Path) -> None:
     assert request_response.status_code == 201
     assert request_response.json()["electronic_delivery_delay_minutes"] == 90
     assert "через 90 мин." in request_response.json()["confirmation_message"]
+
+
+def test_admin_can_update_mail_provider_settings(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+
+    with client:
+        login_admin(client)
+        response = client.post(
+            "/admin/settings/mail",
+            data={
+                "provider_key": "yandex",
+                "smtp_from_email": "robot@example.com",
+                "smtp_username": "robot@example.com",
+                "smtp_password": "smtp-secret",
+                "imap_username": "robot@example.com",
+                "imap_password": "imap-secret",
+                "outbound_mail_enabled": "on",
+                "inbound_mail_enabled": "on",
+            },
+        )
+
+    assert response.status_code == 200
+    assert "Почтовые настройки сохранены." in response.text
+    assert "Yandex" in response.text
+
+    with connect(database_path) as connection:
+        rows = {
+            row["setting_key"]: row["setting_value"]
+            for row in connection.execute(
+                "SELECT setting_key, setting_value FROM system_settings"
+            ).fetchall()
+        }
+
+    assert rows["mail_provider_key"] == "yandex"
+    assert rows["smtp_host"] == "smtp.yandex.com"
+    assert rows["smtp_port"] == "465"
+    assert rows["smtp_security"] == "ssl"
+    assert rows["imap_host"] == "imap.yandex.com"
+    assert rows["imap_port"] == "993"
+    assert rows["outbound_mail_enabled"] == "1"
+    assert rows["inbound_mail_enabled"] == "1"
+
+
+class FakeMailReceiver:
+    def __init__(self, messages: list[object]) -> None:
+        self._messages = messages
+
+    def fetch_unseen(self, *, limit: int = 20) -> list[object]:
+        return self._messages[:limit]
+
+
+def test_sync_incoming_emails_imports_messages(tmp_path: Path) -> None:
+    client, database_path = make_client(tmp_path)
+    settings = make_settings(database_path)
+    with client:
+        pass
+    now = "2026-06-07T12:00:00+00:00"
+    set_system_setting(
+        database_path,
+        key="inbound_mail_enabled",
+        value="1",
+        updated_at=now,
+    )
+    set_system_setting(
+        database_path,
+        key="mail_provider_key",
+        value="custom",
+        updated_at=now,
+    )
+
+    receiver = FakeMailReceiver(
+        [
+            ReceivedEmail(
+                mailbox_name="INBOX",
+                message_uid="101",
+                message_id="<msg-101@example.test>",
+                from_email="reader@example.test",
+                from_name="Reader",
+                subject="Вопрос по Антологии",
+                body_text="Подскажите, как получить бумажную версию?",
+                received_at="Fri, 07 Jun 2026 12:00:00 +0000",
+            )
+        ]
+    )
+
+    result = sync_incoming_emails(
+        database_path,
+        settings,
+        receiver=receiver,
+    )
+
+    assert result.processed_count == 1
+    assert result.imported_count == 1
+    assert result.duplicate_count == 0
+
+    with connect(database_path) as connection:
+        rows = connection.execute(
+            "SELECT from_email, subject, mailbox_name FROM inbound_emails"
+        ).fetchall()
+
+    assert len(rows) == 1
+    assert rows[0]["from_email"] == "reader@example.test"
+    assert rows[0]["subject"] == "Вопрос по Антологии"
+    assert rows[0]["mailbox_name"] == "INBOX"
 
 
 def test_admin_request_detail_shows_contact_data(tmp_path: Path) -> None:
