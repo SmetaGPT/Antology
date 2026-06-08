@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useInView } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Users, Award, BookOpen, Expand, X } from 'lucide-react';
 import { useThemeStyles } from '../../hooks/useThemeStyles';
+import { assetUrl } from '../../utils/assetUrl';
 
 const features = [
   {
@@ -23,27 +24,27 @@ const features = [
 
 const galleryImages = [
   {
-    src: '/isaac-gallery/01-cathedral.jpeg',
+    src: assetUrl('/isaac-gallery/01-cathedral.jpeg'),
     alt: 'Исаакиевский собор в Санкт-Петербурге вечером',
     caption: 'Исаакиевский собор',
   },
   {
-    src: '/isaac-gallery/02-photo1.jpg',
+    src: assetUrl('/isaac-gallery/02-photo1.jpg'),
     alt: 'Гости презентации в интерьере Исаакиевского собора',
     caption: 'Зал презентации',
   },
   {
-    src: '/isaac-gallery/03-photo2.jpg',
+    src: assetUrl('/isaac-gallery/03-photo2.jpg'),
     alt: 'Участники официальной презентации издания',
     caption: 'Официальная презентация',
   },
   {
-    src: '/isaac-gallery/04-photo3.jpg',
+    src: assetUrl('/isaac-gallery/04-photo3.jpg'),
     alt: 'Момент мероприятия в Исаакиевском соборе',
     caption: 'Профессиональное сообщество',
   },
   {
-    src: '/isaac-gallery/05-photo4.jpg',
+    src: assetUrl('/isaac-gallery/05-photo4.jpg'),
     alt: 'Передача издания во время презентации',
     caption: 'Передача книжного комплекта',
   },

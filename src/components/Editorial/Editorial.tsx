@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
 import { useRef } from 'react';
 import { useThemeStyles } from '../../hooks/useThemeStyles';
+import { assetUrl } from '../../utils/assetUrl';
 
 export function Editorial() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -97,7 +98,7 @@ export function Editorial() {
             <div className={`editorial-frame ${isDark ? 'editorial-frame-dark' : 'editorial-frame-light'}`}>
               <div className="editorial-frame-inner">
                 <img
-                  src="/razvorot.png"
+                  src={assetUrl('/razvorot.png')}
                   alt="Книжный разворот Антологии"
                   className={`h-full w-full object-contain ${isDark ? 'bg-graphite-950/65' : 'bg-white/70'}`}
                 />

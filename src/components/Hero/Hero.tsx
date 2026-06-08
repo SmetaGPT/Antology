@@ -2,6 +2,7 @@ import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight, BookOpen } from 'lucide-react';
 import { useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { assetUrl } from '../../utils/assetUrl';
 
 export function Hero() {
   const { theme } = useTheme();
@@ -15,7 +16,7 @@ export function Hero() {
   const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   const isDark = theme === 'dark';
-  const heroBackgroundSrc = isDark ? '/mainpage-dark.png' : '/mainpage-light.png';
+  const heroBackgroundSrc = isDark ? assetUrl('/mainpage-dark.png') : assetUrl('/mainpage-light.png');
 
   return (
     <section
@@ -35,7 +36,7 @@ export function Hero() {
           alt="Историческая карта России"
           className="absolute inset-0 w-full h-full object-cover object-center brightness-110"
           onError={(event) => {
-            const fallback = '/mainpage.png';
+            const fallback = assetUrl('/mainpage.png');
             if (event.currentTarget.getAttribute('src') !== fallback) {
               event.currentTarget.setAttribute('src', fallback);
             }
